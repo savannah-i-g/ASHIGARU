@@ -78,6 +78,8 @@ ASHIGARU is a terminal-based operating system interface that combines the power 
 
 ---
 
+---
+
 ## Installation
 
 ### Standard Installation
