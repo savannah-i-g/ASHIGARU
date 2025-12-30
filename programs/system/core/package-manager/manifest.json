@@ -1,0 +1,10 @@
+{
+    "id": "package-manager",
+    "name": "Package Manager",
+    "version": "1.0.0",
+    "description": "Download and install programs from GitHub or URLs",
+    "author": "ASHIGARU",
+    "icon": "↓",
+    "category": "system",
+    "entry": "index.js"
+}
