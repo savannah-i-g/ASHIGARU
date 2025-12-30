@@ -7,6 +7,10 @@ dist/
 # Environment variables (contains secrets)
 .env
 
+# AI Folders
+.claude/
+.agent/
+
 # IDE
 .vscode/
 .idea/

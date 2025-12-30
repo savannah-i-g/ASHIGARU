@@ -1,0 +1,10 @@
+{
+  "id": "environment-manager",
+  "name": "Environment Manager",
+  "version": "1.0.0",
+  "description": "View, edit, and manage environment variables",
+  "author": "ASHIGARU",
+  "icon": "V",
+  "category": "system",
+  "entry": "index.js"
+}

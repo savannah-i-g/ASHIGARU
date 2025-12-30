@@ -71,6 +71,15 @@ export interface ProgramProps {
 
     /** Get wallpaper content callback (optional) */
     getWallpaperContent?: (name: string) => string[];
+
+    /** Previously saved state (optional - for state persistence) */
+    savedState?: unknown;
+
+    /** Save current state callback (optional - for state persistence) */
+    saveState?: (state: unknown) => void;
+
+    /** Clear saved state callback (optional - for state persistence) */
+    clearState?: () => void;
 }
 
 /**
