@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback } from 'react';
 import { Box } from 'ink';
 import type { ProgramModule, WindowInstance } from '../types/program.js';
 import { useSettings } from './SettingsContext.js';
+import { stateManager } from './StateManager.js';
 
 interface WindowManagerContextType {
     /** Currently open windows */
@@ -12,6 +13,12 @@ interface WindowManagerContextType {
 
     /** Whether input is locked (program has exclusive input) */
     inputLocked: boolean;
+
+    /** Window states map */
+    windowStates: Map<string, unknown>;
+
+    /** Set window state */
+    setWindowState: (windowId: string, state: unknown) => void;
 
     /** Open a new window with the given program */
     openWindow: (program: ProgramModule) => string;
@@ -58,9 +65,13 @@ export const WindowManagerProvider: React.FC<WindowManagerProviderProps> = ({
     const [windows, setWindows] = useState<WindowInstance[]>([]);
     const [focusedWindowId, setFocusedWindowId] = useState<string | null>(null);
     const [inputLocked, setInputLocked] = useState(false);
+    const [windowStates, setWindowStates] = useState<Map<string, unknown>>(new Map());
 
     const openWindow = useCallback((program: ProgramModule): string => {
         const windowId = `window-${++windowIdCounter}`;
+
+        // Load saved state if it exists
+        const savedState = stateManager.loadState(program.manifest.id);
 
         const newWindow: WindowInstance = {
             id: windowId,
@@ -75,12 +86,32 @@ export const WindowManagerProvider: React.FC<WindowManagerProviderProps> = ({
             return [...updated, newWindow];
         });
 
+        // Store the saved state for this window
+        if (savedState) {
+            setWindowStates((prev) => new Map(prev).set(windowId, savedState));
+        }
+
         setFocusedWindowId(windowId);
         return windowId;
     }, []);
 
     const closeWindow = useCallback((windowId: string) => {
         setWindows((prev) => {
+            // Find the window being closed
+            const closingWindow = prev.find((w) => w.id === windowId);
+
+            // Clear saved state for this program when explicitly closing
+            if (closingWindow) {
+                stateManager.clearState(closingWindow.program.manifest.id);
+            }
+
+            // Remove window state from map
+            setWindowStates((states) => {
+                const newStates = new Map(states);
+                newStates.delete(windowId);
+                return newStates;
+            });
+
             const filtered = prev.filter((w) => w.id !== windowId);
 
             if (focusedWindowId === windowId && filtered.length > 0) {
@@ -154,6 +185,15 @@ export const WindowManagerProvider: React.FC<WindowManagerProviderProps> = ({
 
     const minimizeWindow = useCallback((windowId: string) => {
         setWindows((prev) => {
+            // Save current state when minimizing
+            const windowToMinimize = prev.find((w) => w.id === windowId);
+            if (windowToMinimize) {
+                const currentState = windowStates.get(windowId);
+                if (currentState !== undefined) {
+                    stateManager.saveState(windowToMinimize.program.manifest.id, currentState);
+                }
+            }
+
             const updated = prev.map((w) => ({
                 ...w,
                 isMinimized: w.id === windowId ? true : w.isMinimized,
@@ -176,7 +216,7 @@ export const WindowManagerProvider: React.FC<WindowManagerProviderProps> = ({
 
             return updated;
         });
-    }, [focusedWindowId]);
+    }, [focusedWindowId, windowStates]);
 
     const restoreWindow = useCallback((windowId: string) => {
         setWindows((prev) =>
@@ -203,10 +243,20 @@ export const WindowManagerProvider: React.FC<WindowManagerProviderProps> = ({
         setInputLocked(false);
     }, []);
 
+    const setWindowState = useCallback((windowId: string, state: unknown) => {
+        setWindowStates((prev) => {
+            const newStates = new Map(prev);
+            newStates.set(windowId, state);
+            return newStates;
+        });
+    }, []);
+
     const value: WindowManagerContextType = {
         windows,
         focusedWindowId,
         inputLocked,
+        windowStates,
+        setWindowState,
         openWindow,
         closeWindow,
         focusWindow,
@@ -238,7 +288,7 @@ export const useWindowManager = (): WindowManagerContextType => {
  * Renders all open, non-minimized windows in a tiled layout
  */
 export const WindowContainer: React.FC = () => {
-    const { windows, closeWindow, focusWindow, lockInput, unlockInput } = useWindowManager();
+    const { windows, windowStates, setWindowState, closeWindow, focusWindow, lockInput, unlockInput } = useWindowManager();
     const { settings, setTheme, setWallpaper, updateSettings, availableWallpapers, getWallpaperContent } = useSettings();
 
     const visibleWindows = windows.filter((w) => !w.isMinimized);
@@ -252,6 +302,18 @@ export const WindowContainer: React.FC = () => {
             {visibleWindows.map((window) => {
                 const { program, id, isFocused } = window;
                 const Component = program.component;
+
+                // Get saved state for this window
+                const savedState = windowStates.get(id);
+
+                // Create state management callbacks
+                const saveState = (state: unknown) => {
+                    setWindowState(id, state);
+                };
+
+                const clearState = () => {
+                    stateManager.clearState(program.manifest.id);
+                };
 
                 return (
                     <Box key={id} flexGrow={1} flexBasis={0}>
@@ -268,6 +330,9 @@ export const WindowContainer: React.FC = () => {
                             updateSettings={updateSettings}
                             availableWallpapers={availableWallpapers}
                             getWallpaperContent={getWallpaperContent}
+                            savedState={savedState}
+                            saveState={saveState}
+                            clearState={clearState}
                         />
                     </Box>
                 );

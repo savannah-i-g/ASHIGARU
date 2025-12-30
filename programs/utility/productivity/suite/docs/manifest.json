@@ -1,0 +1,10 @@
+{
+  "id": "suite-docs",
+  "name": "Suite Docs",
+  "version": "1.0.0",
+  "description": "Document editor with Markdown support",
+  "author": "ASHIGARU",
+  "icon": "D",
+  "category": "utility",
+  "entry": "index.js"
+}

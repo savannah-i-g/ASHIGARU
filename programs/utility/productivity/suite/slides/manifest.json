@@ -1,0 +1,10 @@
+{
+  "id": "suite-slides",
+  "name": "Suite Slides",
+  "version": "1.0.0",
+  "description": "Presentation viewer with JSON slide format",
+  "author": "ASHIGARU",
+  "icon": "P",
+  "category": "utility",
+  "entry": "index.js"
+}

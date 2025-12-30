@@ -1,0 +1,10 @@
+{
+  "id": "formatter",
+  "name": "Data Formatter",
+  "version": "1.0.0",
+  "description": "Format, validate, and convert JSON/YAML/XML files",
+  "author": "ASHIGARU",
+  "icon": "J",
+  "category": "utility",
+  "entry": "index.js"
+}

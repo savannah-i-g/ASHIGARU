@@ -1,0 +1,10 @@
+{
+  "id": "suite-sheets",
+  "name": "Suite Sheets",
+  "version": "1.0.0",
+  "description": "Spreadsheet viewer and editor for CSV files",
+  "author": "ASHIGARU",
+  "icon": "S",
+  "category": "utility",
+  "entry": "index.js"
+}

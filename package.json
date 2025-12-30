@@ -1,6 +1,6 @@
 {
   "name": "ashigaru",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "ASHIGARU - A modular TUI framework",
   "type": "module",
   "main": "dist/index.js",
@@ -21,7 +21,9 @@
     "@inkjs/ui": "^2.0.0",
     "@pppp606/ink-chart": "^0.2.3",
     "ai": "^6.0.3",
+    "diff": "^8.0.2",
     "dotenv": "^17.2.3",
+    "fast-xml-parser": "^5.3.3",
     "ink": "^6.6.0",
     "ink-divider": "^4.1.1",
     "ink-markdown": "^1.0.4",
@@ -31,11 +33,15 @@
     "ink-syntax-highlight": "^2.0.2",
     "ink-table": "^3.1.0",
     "ink-text-input": "^6.0.0",
+    "js-yaml": "^4.1.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "systeminformation": "^5.28.5",
     "zod": "^4.2.1"
   },
   "devDependencies": {
+    "@types/diff": "^7.0.2",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.0",
     "ts-node": "^10.9.2",

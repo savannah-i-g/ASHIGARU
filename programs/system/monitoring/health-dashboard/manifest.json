@@ -1,0 +1,10 @@
+{
+  "id": "health-dashboard",
+  "name": "System Health",
+  "version": "1.0.0",
+  "description": "Monitor system health with alerts and quick-fix suggestions",
+  "author": "ASHIGARU",
+  "icon": "K",
+  "category": "system",
+  "entry": "index.js"
+}
