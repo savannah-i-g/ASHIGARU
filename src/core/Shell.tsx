@@ -470,10 +470,13 @@ export const Shell: React.FC = () => {
         if (inputLocked) return;
         if (showLauncher || showWindowList) return;
 
-        if (input === 'q') { exit(); return; }
-        if ((input === 'x' || input === 'w') && visibleWindows.length > 0) { closeFocusedWindow(); return; }
-        if (input === 'm' && visibleWindows.length > 0) { minimizeFocused(); return; }
-        if (key.ctrl && input === 'l') { setShowLauncher(true); return; }
+        // All window controls require Ctrl modifier
+        if (key.ctrl) {
+            if (input === 'q') { exit(); return; }
+            if ((input === 'x' || input === 'w') && visibleWindows.length > 0) { closeFocusedWindow(); return; }
+            if (input === 'd' && visibleWindows.length > 0) { minimizeFocused(); return; }
+            if (input === 'l') { setShowLauncher(true); return; }
+        }
         if (key.tab) { focusNext(); return; }
         if (input === '`' || input === '~') { setShowWindowList(true); return; }
     });

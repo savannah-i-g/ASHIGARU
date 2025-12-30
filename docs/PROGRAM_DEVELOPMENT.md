@@ -11,6 +11,7 @@ A comprehensive guide for creating, packaging, and distributing programs for the
 - [Entry File Requirements](#entry-file-requirements)
 - [Complete API Reference](#complete-api-reference)
 - [State Persistence](#state-persistence)
+- [Sound System](#sound-system)
 - [Available Ink Components](#available-ink-components)
 - [System APIs and Utilities](#system-apis-and-utilities)
 - [Best Practices](#best-practices)
@@ -722,6 +723,138 @@ To test your implementation:
 - Add version field to state
 - Validate state structure before restoring
 - Provide migration logic for old versions
+
+---
+
+## Sound System
+
+ASHIGARU includes an optional sound system that provides audio feedback for UI events. Sounds are disabled by default and can be enabled in the Control Panel → Audio settings.
+
+### Prerequisites
+
+For sound effects to work, you need an audio player installed:
+
+**Linux (Recommended):**
+```bash
+sudo apt install mpg123
+```
+
+**Alternative players** (detected automatically):
+- `ffplay` (FFmpeg)
+- `mpv`
+- `mplayer`
+- `cvlc` (VLC command-line)
+
+### Sound Types
+
+The system provides predefined sound types:
+
+| Type | Description | Default Trigger |
+|------|-------------|-----------------|
+| `click` | Button activation/submit | Window open |
+| `hover` | Focus change/selection | (Available for custom use) |
+| `success` | Successful operation | (Available for custom use) |
+| `error` | Error or failure | Window close |
+| `notify` | Notification alert | (Available for custom use) |
+| `open` | Window/menu opening | (Legacy, use `click`) |
+| `close` | Window/menu closing | (Legacy, use `error`) |
+
+### Using Sounds in Programs
+
+Import the sound utility and call the appropriate function:
+
+```javascript
+import { playSound, playClick, playSuccess, playError } from '../utils/sound.js';
+
+// Check if sounds are enabled from settings prop
+const { settings } = props;
+
+// Play a specific sound type
+playSound('success', settings.sounds);
+
+// Or use convenience wrappers
+playClick(settings.sounds);
+playSuccess(settings.sounds);
+playError(settings.sounds);
+```
+
+### Complete Example
+
+```javascript
+import React from 'react';
+import { Box, Text, useInput } from 'ink';
+import { playClick, playError } from '../utils/sound.js';
+
+const MyProgram = ({ isFocused, onClose, settings }) => {
+    const handleAction = () => {
+        // Play success sound when action completes
+        playClick(settings?.sounds || false);
+        // ... perform action
+    };
+
+    const handleError = () => {
+        // Play error sound on failure
+        playError(settings?.sounds || false);
+    };
+
+    useInput((input, key) => {
+        if (!isFocused) return;
+        
+        if (key.escape) {
+            onClose();
+            return;
+        }
+        
+        if (key.return) {
+            handleAction();
+        }
+    }, { isActive: isFocused });
+
+    return (
+        <Box borderStyle="single" flexGrow={1}>
+            <Text>Press Enter to trigger action with sound</Text>
+        </Box>
+    );
+};
+
+export default MyProgram;
+```
+
+### Adding Custom Sounds
+
+1. **Place MP3 files** in the `sounds/` directory:
+   - `sounds/click.mp3`
+   - `sounds/hover.mp3`
+   - `sounds/success.mp3`
+   - `sounds/error.mp3`
+   - `sounds/notify.mp3`
+   - `sounds/open.mp3`
+   - `sounds/close.mp3`
+
+2. **Keep sounds short** (< 0.5 seconds) for responsive feedback
+
+3. **Use low volume** to avoid being disruptive
+
+### Sound API Reference
+
+#### `playSound(type: SoundType, soundsEnabled: boolean): void`
+- Plays a sound of the specified type
+- Does nothing if `soundsEnabled` is `false`
+- Fails silently if sound file is missing or no audio player is available
+
+#### Convenience Functions
+- `playClick(soundsEnabled: boolean)` - Click/activation sound
+- `playHover(soundsEnabled: boolean)` - Focus/selection sound
+- `playSuccess(soundsEnabled: boolean)` - Success sound
+- `playError(soundsEnabled: boolean)` - Error sound
+
+### Best Practices
+
+1. **Always check settings** - Pass `settings.sounds` to sound functions
+2. **Don't assume availability** - Sound playback may fail silently (no player, missing files)
+3. **Keep sounds subtle** - Users should be able to work without sound
+4. **Use appropriate types** - Match sound type to the action context
+5. **Fire and forget** - Sound functions are async but don't need to be awaited
 
 ---
 

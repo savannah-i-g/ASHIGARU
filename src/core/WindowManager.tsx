@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { Box } from 'ink';
 import type { ProgramModule, WindowInstance } from '../types/program.js';
 import { useSettings } from './SettingsContext.js';
 import { stateManager } from './StateManager.js';
+import { playSound } from '../utils/sound.js';
 
 interface WindowManagerContextType {
     /** Currently open windows */
@@ -62,13 +63,23 @@ interface WindowManagerProviderProps {
 export const WindowManagerProvider: React.FC<WindowManagerProviderProps> = ({
     children,
 }) => {
+    const { settings } = useSettings();
     const [windows, setWindows] = useState<WindowInstance[]>([]);
     const [focusedWindowId, setFocusedWindowId] = useState<string | null>(null);
     const [inputLocked, setInputLocked] = useState(false);
     const [windowStates, setWindowStates] = useState<Map<string, unknown>>(new Map());
 
+    // Use ref to access current settings in callbacks without recreating them
+    const settingsRef = useRef(settings);
+    useEffect(() => {
+        settingsRef.current = settings;
+    }, [settings]);
+
     const openWindow = useCallback((program: ProgramModule): string => {
         const windowId = `window-${++windowIdCounter}`;
+
+        // Play open sound
+        playSound('click', settingsRef.current.sounds);
 
         // Load saved state if it exists
         const savedState = stateManager.loadState(program.manifest.id);
@@ -96,6 +107,9 @@ export const WindowManagerProvider: React.FC<WindowManagerProviderProps> = ({
     }, []);
 
     const closeWindow = useCallback((windowId: string) => {
+        // Play close sound
+        playSound('error', settingsRef.current.sounds);
+
         setWindows((prev) => {
             // Find the window being closed
             const closingWindow = prev.find((w) => w.id === windowId);
