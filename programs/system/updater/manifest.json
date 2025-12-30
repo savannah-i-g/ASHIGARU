@@ -1,0 +1,10 @@
+{
+  "id": "updater",
+  "name": "System Updater",
+  "version": "1.0.0",
+  "description": "Check for and install ASHIGARU updates",
+  "author": "ASHIGARU",
+  "icon": "↑",
+  "category": "system",
+  "entry": "index.js"
+}
