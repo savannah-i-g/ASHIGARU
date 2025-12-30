@@ -93,7 +93,7 @@ export async function extractRelease(tarballPath) {
  */
 export function runNpmInstall(onOutput) {
   return new Promise((resolve, reject) => {
-    const proc = spawn('npm', ['install'], {
+    const proc = spawn('npm', ['install', '--legacy-peer-deps'], {
       cwd: process.cwd(),
       env: process.env,
       shell: true
