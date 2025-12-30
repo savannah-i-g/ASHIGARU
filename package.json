@@ -1,6 +1,6 @@
 {
   "name": "ashigaru",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "ASHIGARU - A modular TUI framework",
   "type": "module",
   "main": "dist/index.js",
