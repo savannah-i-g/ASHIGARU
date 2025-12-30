@@ -10,6 +10,9 @@ interface Settings {
     sounds: boolean;
     wallpaper: string;
     wallpaperColor: string;
+    clockFormat: '12h' | '24h';
+    performanceMode: boolean;
+    refreshRate: number;
 }
 
 interface SettingsContextType {
@@ -29,6 +32,9 @@ const defaultSettings: Settings = {
     sounds: false,
     wallpaper: 'ashigaru',
     wallpaperColor: 'muted',
+    clockFormat: '24h',
+    performanceMode: false,
+    refreshRate: 3000,
 };
 
 const SETTINGS_PATH = path.join(os.homedir(), '.cypher-tui-settings.json');

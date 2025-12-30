@@ -28,11 +28,11 @@ export const StatusBar: React.FC<StatusBarProps> = ({
                 <Text color={theme.colors.fg.muted}>menu</Text>
                 <Badge color="cyan">`</Badge>
                 <Text color={theme.colors.fg.muted}>windows</Text>
-                <Badge color="yellow">M</Badge>
+                <Badge color="yellow">^D</Badge>
                 <Text color={theme.colors.fg.muted}>min</Text>
-                <Badge color="red">X</Badge>
+                <Badge color="red">^X</Badge>
                 <Text color={theme.colors.fg.muted}>close</Text>
-                <Badge color="red">Q</Badge>
+                <Badge color="red">^Q</Badge>
                 <Text color={theme.colors.fg.muted}>quit</Text>
             </Box>
         </Box>

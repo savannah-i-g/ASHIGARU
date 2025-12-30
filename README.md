@@ -1,6 +1,6 @@
 # ASHIGARU
 
-![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7.2-blue.svg)
@@ -74,6 +74,9 @@ ASHIGARU is a terminal-based operating system interface that combines the power 
 
 - Google Gemini API key for AI features
 - Git for development and contributions
+- Audio player for sound effects (one of: `mpg123`, `ffplay`, `mpv`, `vlc`)
+
+---
 
 ---
 
@@ -144,7 +147,13 @@ ASHIGARU includes a comprehensive suite of built-in programs organized into syst
 
 #### Core
 
-**Settings** - Configure application preferences including theme selection, animation settings, sound options, and wallpaper customization. Settings persist across sessions.
+**Control Panel** - Comprehensive system configuration center with categorized settings:
+- **Display**: Theme selection, wallpaper, and wallpaper color customization
+- **Audio**: Enable/disable sound effects for UI feedback
+- **System**: Animations, performance mode, and refresh rate settings
+- **Date & Time**: Clock format preferences and timezone display
+- **Shortcuts**: Reference guide for all keyboard shortcuts
+- **About**: System information, version, and credits
 
 **System Updater** - Check for and install ASHIGARU updates from GitHub releases. Features automatic backup creation, safe installation with rollback capability, and progress tracking.
 
@@ -206,13 +215,15 @@ Office productivity applications with full state persistence support.
 
 ### Global Shortcuts
 
-- `Ctrl+L` - Open program launcher menu
-- `` ` `` (backtick) - Toggle window list
-- `M` - Minimize focused window
-- `X` - Close focused window
-- `Q` - Quit ASHIGARU
-- `Tab` - Cycle focus between windows
-- `Esc` - Cancel/close current dialog or menu
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+L` | Open program launcher menu |
+| `` ` `` (backtick) | Toggle window list |
+| `Ctrl+D` | Minimize focused window |
+| `Ctrl+X` or `Ctrl+W` | Close focused window |
+| `Ctrl+Q` | Quit ASHIGARU |
+| `Tab` | Cycle focus between windows |
+| `Esc` | Cancel/close current dialog or menu |
 
 ### Window Management
 
@@ -516,7 +527,27 @@ For issues, feature requests, or questions:
 
 ## Changelog
 
-### v1.2.0 (Latest)
+### v1.2.2 (Latest)
+
+**Major Features:**
+- **Control Panel** - Complete redesign of Settings as a full-featured Control Panel with categorized sidebar navigation
+- **Sound System** - Optional audio feedback for window open/close events using `cli-sound`
+- **Updated Keyboard Shortcuts** - All window controls now use Ctrl+key format for consistency
+
+**New Settings:**
+- Clock format (12h/24h)
+- Performance mode toggle
+- Refresh rate configuration for monitoring programs
+
+**Dependencies:**
+- Added: cli-sound (for optional audio feedback)
+
+**Note:** For sound effects to work, install an audio player:
+```bash
+sudo apt install mpg123   # Recommended for Linux
+```
+
+### v1.2.0
 
 **Major Features:**
 - State Persistence system for automatic save/restore of program states
