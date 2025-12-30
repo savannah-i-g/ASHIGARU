@@ -1,0 +1,10 @@
+{
+    "id": "browser",
+    "name": "Browser",
+    "version": "1.0.0",
+    "description": "Text-based web browser",
+    "author": "ASHIGARU",
+    "icon": "@",
+    "category": "utility",
+    "entry": "index.js"
+}

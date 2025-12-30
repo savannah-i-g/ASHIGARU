@@ -1,0 +1,10 @@
+{
+    "id": "terminal",
+    "name": "Terminal",
+    "version": "1.0.0",
+    "description": "Interactive shell terminal",
+    "author": "ASHIGARU",
+    "icon": ">",
+    "category": "utility",
+    "entry": "index.js"
+}

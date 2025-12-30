@@ -1,0 +1,10 @@
+{
+    "id": "file-browser",
+    "name": "File Browser",
+    "version": "1.0.0",
+    "description": "Navigate the filesystem",
+    "author": "CYPHER",
+    "icon": "+",
+    "category": "utility",
+    "entry": "index.js"
+}

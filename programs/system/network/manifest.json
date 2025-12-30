@@ -1,0 +1,10 @@
+{
+    "id": "network",
+    "name": "Network",
+    "version": "1.0.0",
+    "description": "Network interfaces and connections",
+    "author": "CYPHER",
+    "icon": "~",
+    "category": "system",
+    "entry": "index.js"
+}

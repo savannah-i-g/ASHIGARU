@@ -1,0 +1,10 @@
+{
+    "id": "system-info",
+    "name": "System Info",
+    "version": "1.0.0",
+    "description": "Display system information",
+    "author": "CYPHER",
+    "icon": "*",
+    "category": "system",
+    "entry": "index.js"
+}

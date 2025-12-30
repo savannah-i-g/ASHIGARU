@@ -1,0 +1,10 @@
+{
+    "id": "process-manager",
+    "name": "Processes",
+    "version": "1.0.0",
+    "description": "View and manage running processes",
+    "author": "CYPHER",
+    "icon": "@",
+    "category": "system",
+    "entry": "index.js"
+}

@@ -1,0 +1,10 @@
+{
+    "id": "neorin-ai",
+    "name": "NeoRIN/AI",
+    "version": "1.0.0",
+    "description": "Experimental",
+    "author": "ASHIGARU",
+    "icon": "◈",
+    "category": "utility",
+    "entry": "index.js"
+}

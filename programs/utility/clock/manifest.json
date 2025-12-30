@@ -1,0 +1,10 @@
+{
+    "id": "clock",
+    "name": "Clock",
+    "version": "1.0.0",
+    "description": "Digital clock and timer",
+    "author": "CYPHER",
+    "icon": ":",
+    "category": "utility",
+    "entry": "index.js"
+}

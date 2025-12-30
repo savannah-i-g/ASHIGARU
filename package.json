@@ -1,0 +1,44 @@
+{
+  "name": "ashigaru",
+  "version": "1.0.0",
+  "description": "ASHIGARU - A modular TUI framework",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node --loader ts-node/esm src/index.tsx",
+    "dev": "node --loader ts-node/esm --watch src/index.tsx"
+  },
+  "keywords": [
+    "tui",
+    "cli",
+    "ink",
+    "terminal"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.1",
+    "@inkjs/ui": "^2.0.0",
+    "@pppp606/ink-chart": "^0.2.3",
+    "ai": "^6.0.3",
+    "dotenv": "^17.2.3",
+    "ink": "^6.6.0",
+    "ink-divider": "^4.1.1",
+    "ink-markdown": "^1.0.4",
+    "ink-scroll-view": "^0.3.3",
+    "ink-select-input": "^6.2.0",
+    "ink-spinner": "^5.0.0",
+    "ink-syntax-highlight": "^2.0.2",
+    "ink-table": "^3.1.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  }
+}

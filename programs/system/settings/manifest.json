@@ -1,0 +1,10 @@
+{
+    "id": "settings",
+    "name": "Settings",
+    "version": "1.0.0",
+    "description": "Configure preferences",
+    "author": "CYPHER",
+    "icon": "#",
+    "category": "system",
+    "entry": "index.js"
+}

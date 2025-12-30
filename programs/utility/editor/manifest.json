@@ -1,0 +1,10 @@
+{
+    "id": "editor",
+    "name": "Editor",
+    "version": "1.0.0",
+    "description": "Vim-like code editor with syntax highlighting",
+    "author": "ASHIGARU",
+    "icon": "E",
+    "category": "utility",
+    "entry": "index.js"
+}

@@ -1,0 +1,10 @@
+{
+    "id": "notes",
+    "name": "Notes",
+    "version": "1.0.0",
+    "description": "Quick notes and reminders",
+    "author": "CYPHER",
+    "icon": "=",
+    "category": "utility",
+    "entry": "index.js"
+}
