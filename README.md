@@ -151,7 +151,7 @@ Vim-like code editor with syntax highlighting support. Features multiple editing
 AI-powered assistant using Google Gemini. Provides conversational AI capabilities with session management and context retention. Features a specialized system prompt for technical and strategic analysis.
 
 **Browser**
-Text-based web browser for viewing web content in the terminal. Supports basic HTML rendering and navigation.
+Text-based web browser for viewing web content in the terminal. Supports basic HTML rendering and navigation. Not intended for production use, but fun to use anyway.
 
 **Clock**
 Digital clock and timer utility with customizable display options.
