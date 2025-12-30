@@ -1,76 +1,354 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp, useStdout } from 'ink';
 import { Badge } from '@inkjs/ui';
+import TextInput from 'ink-text-input';
 import { StatusBar } from '../components/StatusBar.js';
 import { MenuBar } from '../components/MenuBar.js';
 import { Desktop } from '../components/Desktop.js';
 import { useWindowManager, WindowContainer } from './WindowManager.js';
 import { useSettings } from './SettingsContext.js';
-import { programLoader } from './ProgramLoader.js';
+import { programLoader, DirectoryContents } from './ProgramLoader.js';
 import type { ProgramModule } from '../types/program.js';
 
-interface CategoryData {
-    name: string;
-    programs: ProgramModule[];
-}
+/**
+ * Scrolling text component - scrolls when selected, truncates when not
+ */
+const ScrollingText: React.FC<{
+    text: string;
+    maxWidth: number;
+    isSelected: boolean;
+    color: string;
+}> = ({ text, maxWidth, isSelected, color }) => {
+    const [offset, setOffset] = useState(0);
+
+    // Reset offset when selection changes
+    useEffect(() => {
+        setOffset(0);
+    }, [isSelected, text]);
+
+    // Scroll animation when selected and text is too long
+    useEffect(() => {
+        if (!isSelected || text.length <= maxWidth) {
+            setOffset(0);
+            return;
+        }
+
+        const totalLength = text.length + 3; // Add spacing for loop
+        const interval = setInterval(() => {
+            setOffset((prev) => (prev + 1) % totalLength);
+        }, 300); // Scroll speed
+
+        return () => clearInterval(interval);
+    }, [isSelected, text, maxWidth]);
+
+    // If text fits, just show it
+    if (text.length <= maxWidth) {
+        return <Text color={color}>{text}</Text>;
+    }
+
+    // If not selected, truncate with ellipsis
+    if (!isSelected) {
+        return <Text color={color}>{text.slice(0, maxWidth - 3) + '...'}</Text>;
+    }
+
+    // Scrolling text when selected
+    const paddedText = text + '   ' + text; // Loop seamlessly
+    const visibleText = paddedText.slice(offset, offset + maxWidth);
+
+    return <Text color={color}>{visibleText}</Text>;
+};
 
 interface LauncherProps {
-    categories: CategoryData[];
     onSelect: (program: ProgramModule) => void;
     onClose: () => void;
 }
 
-const Launcher: React.FC<LauncherProps> = ({ categories, onSelect, onClose }) => {
+/**
+ * Search modal for filtering all programs
+ */
+const SearchModal: React.FC<{
+    onSelect: (program: ProgramModule) => void;
+    onClose: () => void;
+}> = ({ onSelect, onClose }) => {
     const { theme } = useSettings();
-    const [categoryIndex, setCategoryIndex] = useState(0);
-    const [programIndex, setProgramIndex] = useState(0);
+    const [query, setQuery] = useState('');
+    const [results, setResults] = useState<ProgramModule[]>([]);
+    const [selectedIndex, setSelectedIndex] = useState(0);
+    const [isSearching, setIsSearching] = useState(true);
 
-    const currentCategory = categories[categoryIndex];
-    const currentProgram = currentCategory?.programs[programIndex];
+    useEffect(() => {
+        const search = async () => {
+            if (query.length > 0) {
+                const found = await programLoader.searchPrograms(query);
+                setResults(found);
+                setSelectedIndex(0);
+            } else {
+                setResults([]);
+            }
+        };
+        search();
+    }, [query]);
 
     useInput((input, key) => {
-        if (key.escape) { onClose(); return; }
-        if (key.leftArrow) { setCategoryIndex((i: number) => (i > 0 ? i - 1 : categories.length - 1)); setProgramIndex(0); return; }
-        if (key.rightArrow) { setCategoryIndex((i: number) => (i < categories.length - 1 ? i + 1 : 0)); setProgramIndex(0); return; }
-        if (key.upArrow && currentCategory) { setProgramIndex((i: number) => (i > 0 ? i - 1 : currentCategory.programs.length - 1)); return; }
-        if (key.downArrow && currentCategory) { setProgramIndex((i: number) => (i < currentCategory.programs.length - 1 ? i + 1 : 0)); return; }
-        if (key.return && currentProgram) { onSelect(currentProgram); return; }
+        if (!isSearching) {
+            if (key.escape) {
+                onClose();
+                return;
+            }
+            if (key.upArrow) {
+                setSelectedIndex((i) => Math.max(0, i - 1));
+                return;
+            }
+            if (key.downArrow) {
+                setSelectedIndex((i) => Math.min(results.length - 1, i + 1));
+                return;
+            }
+            if (key.return && results[selectedIndex]) {
+                onSelect(results[selectedIndex]);
+                return;
+            }
+            if (key.tab) {
+                setIsSearching(true);
+                return;
+            }
+        } else {
+            if (key.escape) {
+                onClose();
+                return;
+            }
+            if (key.downArrow || key.return) {
+                if (results.length > 0) {
+                    setIsSearching(false);
+                }
+                return;
+            }
+        }
     });
 
-    const totalPrograms = categories.reduce((sum: number, c: CategoryData) => sum + c.programs.length, 0);
+    return (
+        <Box flexDirection="column" borderStyle={theme.borderStyle} borderColor={theme.colors.accent.secondary} width={60}>
+            <Box paddingX={1} borderStyle={theme.borderStyle} borderColor={theme.colors.border.inactive} borderTop={false} borderLeft={false} borderRight={false}>
+                <Text color={theme.colors.accent.secondary} bold>SEARCH PROGRAMS</Text>
+            </Box>
+            <Box paddingX={1} paddingY={1}>
+                <Text color={theme.colors.fg.muted}>{'> '}</Text>
+                <TextInput
+                    value={query}
+                    onChange={setQuery}
+                    focus={isSearching}
+                    placeholder="Type to search..."
+                />
+            </Box>
+            <Box paddingX={1}><Text color={theme.colors.border.inactive}>{'─'.repeat(56)}</Text></Box>
+            <Box flexDirection="column" paddingX={1} minHeight={8}>
+                {results.length === 0 && query.length > 0 && (
+                    <Text color={theme.colors.fg.muted}>No programs found</Text>
+                )}
+                {results.length === 0 && query.length === 0 && (
+                    <Text color={theme.colors.fg.muted}>Start typing to search...</Text>
+                )}
+                {results.slice(0, 8).map((program, i) => {
+                    const isSel = i === selectedIndex && !isSearching;
+                    const relPath = programLoader.getProgramRelativePath(program);
+                    return (
+                        <Box key={program.manifest.id}>
+                            <Text color={isSel ? theme.colors.accent.secondary : theme.colors.fg.muted}>
+                                {isSel ? '>> ' : '   '}
+                            </Text>
+                            <Box width={18}>
+                                <Text color={isSel ? theme.colors.fg.primary : theme.colors.fg.secondary} bold={isSel}>
+                                    {program.manifest.name}
+                                </Text>
+                            </Box>
+                            <Text color={theme.colors.fg.muted}>
+                                {relPath ? `${relPath}/` : ''}{program.manifest.id}
+                            </Text>
+                        </Box>
+                    );
+                })}
+            </Box>
+            <Box paddingX={1} gap={1} borderStyle={theme.borderStyle} borderColor={theme.colors.border.inactive} borderBottom={false} borderLeft={false} borderRight={false}>
+                <Badge color="cyan">↓</Badge>
+                <Text color={theme.colors.fg.muted}>results</Text>
+                <Badge color="green">Enter</Badge>
+                <Text color={theme.colors.fg.muted}>launch</Text>
+                <Badge color="red">ESC</Badge>
+                <Text color={theme.colors.fg.muted}>back</Text>
+            </Box>
+        </Box>
+    );
+};
+
+/**
+ * File explorer-style program launcher with subdirectory navigation
+ */
+const Launcher: React.FC<LauncherProps> = ({ onSelect, onClose }) => {
+    const { theme } = useSettings();
+    const [currentPath, setCurrentPath] = useState('');
+    const [contents, setContents] = useState<DirectoryContents>({ currentPath: '', folders: [], programs: [] });
+    const [selectedIndex, setSelectedIndex] = useState(0);
+    const [showSearch, setShowSearch] = useState(false);
+    const [loading, setLoading] = useState(true);
+
+    // Combined items: folders first, then programs
+    const items: Array<{ type: 'folder' | 'program'; name: string; program?: ProgramModule }> = [
+        ...contents.folders.map((f) => ({ type: 'folder' as const, name: f })),
+        ...contents.programs.map((p) => ({ type: 'program' as const, name: p.manifest.name, program: p })),
+    ];
+
+    const breadcrumbs = currentPath ? ['PROGRAMS', ...currentPath.split('/')] : ['PROGRAMS'];
+
+    useEffect(() => {
+        const load = async () => {
+            setLoading(true);
+            const dir = await programLoader.getDirectoryContents(currentPath);
+            setContents(dir);
+            setSelectedIndex(0);
+            setLoading(false);
+        };
+        load();
+    }, [currentPath]);
+
+    useInput((input, key) => {
+        if (showSearch) return;
+
+        if (key.escape) {
+            if (currentPath) {
+                // Go up one level
+                const parts = currentPath.split('/');
+                parts.pop();
+                setCurrentPath(parts.join('/'));
+            } else {
+                onClose();
+            }
+            return;
+        }
+
+        if (input === '/') {
+            setShowSearch(true);
+            return;
+        }
+
+        if (key.upArrow) {
+            setSelectedIndex((i) => (i > 0 ? i - 1 : items.length - 1));
+            return;
+        }
+
+        if (key.downArrow) {
+            setSelectedIndex((i) => (i < items.length - 1 ? i + 1 : 0));
+            return;
+        }
+
+        if (key.backspace || key.leftArrow) {
+            if (currentPath) {
+                const parts = currentPath.split('/');
+                parts.pop();
+                setCurrentPath(parts.join('/'));
+            }
+            return;
+        }
+
+        if (key.return || key.rightArrow) {
+            const item = items[selectedIndex];
+            if (!item) return;
+
+            if (item.type === 'folder') {
+                // Navigate into folder
+                setCurrentPath(currentPath ? `${currentPath}/${item.name}` : item.name);
+            } else if (item.program) {
+                // Launch program
+                onSelect(item.program);
+            }
+            return;
+        }
+    });
+
+    if (showSearch) {
+        return (
+            <SearchModal
+                onSelect={(p) => {
+                    setShowSearch(false);
+                    onSelect(p);
+                }}
+                onClose={() => setShowSearch(false)}
+            />
+        );
+    }
+
+    const totalPrograms = items.filter((i) => i.type === 'program').length;
+    const totalFolders = items.filter((i) => i.type === 'folder').length;
 
     return (
         <Box flexDirection="column" borderStyle={theme.borderStyle} borderColor={theme.colors.accent.primary} width={64}>
+            {/* Header */}
             <Box paddingX={1} justifyContent="space-between" borderStyle={theme.borderStyle} borderColor={theme.colors.border.inactive} borderTop={false} borderLeft={false} borderRight={false}>
                 <Text color={theme.colors.accent.primary} bold>PROGRAM LAUNCHER</Text>
-                <Text color={theme.colors.fg.muted}>{totalPrograms} programs</Text>
+                <Box gap={1}>
+                    <Text color={theme.colors.fg.muted}>{totalFolders}🖿 {totalPrograms}⚙</Text>
+                </Box>
             </Box>
-            <Box paddingX={1} gap={1}>
-                {categories.map((cat: CategoryData, i: number) => (
-                    <Box key={cat.name} gap={1}>
-                        <Badge color={i === categoryIndex ? 'cyan' : 'gray'}>{cat.name.toUpperCase()}</Badge>
+
+            {/* Breadcrumb navigation */}
+            <Box paddingX={1} paddingY={0}>
+                {breadcrumbs.map((crumb, i) => (
+                    <Box key={i}>
+                        {i > 0 && <Text color={theme.colors.fg.muted}> {'>'} </Text>}
+                        <Text color={i === breadcrumbs.length - 1 ? theme.colors.accent.primary : theme.colors.fg.muted} bold={i === breadcrumbs.length - 1}>
+                            {crumb.toUpperCase()}
+                        </Text>
                     </Box>
                 ))}
             </Box>
+
             <Box paddingX={1}><Text color={theme.colors.border.inactive}>{'─'.repeat(60)}</Text></Box>
+
+            {/* Contents */}
             <Box flexDirection="column" paddingX={1} paddingY={1} minHeight={12}>
-                {currentCategory?.programs.map((program: ProgramModule, index: number) => (
-                    <Box key={program.manifest.id}>
-                        <Text color={index === programIndex ? theme.colors.accent.primary : theme.colors.fg.muted}>{index === programIndex ? '>> ' : '   '}</Text>
-                        <Box width={16}><Text color={index === programIndex ? theme.colors.fg.primary : theme.colors.fg.secondary} bold={index === programIndex}>{program.manifest.name}</Text></Box>
-                        <Text color={theme.colors.fg.muted}>{program.manifest.description.slice(0, 28)}</Text>
-                    </Box>
-                ))}
-                {(!currentCategory || currentCategory.programs.length === 0) && <Text color={theme.colors.fg.muted}>No programs</Text>}
+                {loading ? (
+                    <Text color={theme.colors.fg.muted}>Loading...</Text>
+                ) : items.length === 0 ? (
+                    <Text color={theme.colors.fg.muted}>Empty directory</Text>
+                ) : (
+                    items.slice(0, 10).map((item, index) => {
+                        const isSel = index === selectedIndex;
+                        const isFolder = item.type === 'folder';
+
+                        return (
+                            <Box key={item.name}>
+                                <Text color={isSel ? theme.colors.accent.primary : theme.colors.fg.muted}>
+                                    {isSel ? '>> ' : '   '}
+                                </Text>
+                                <Text color={isFolder ? theme.colors.accent.secondary : theme.colors.fg.muted}>
+                                    {isFolder ? '🖿 ' : '⚙ '}
+                                </Text>
+                                <Box width={16}>
+                                    <Text color={isSel ? theme.colors.fg.primary : theme.colors.fg.secondary} bold={isSel}>
+                                        {item.name}
+                                    </Text>
+                                </Box>
+                                <ScrollingText
+                                    text={item.program ? item.program.manifest.description : 'Directory'}
+                                    maxWidth={28}
+                                    isSelected={isSel}
+                                    color={theme.colors.fg.muted}
+                                />
+                            </Box>
+                        );
+                    })
+                )}
             </Box>
+
+            {/* Footer controls */}
             <Box paddingX={1} gap={1} borderStyle={theme.borderStyle} borderColor={theme.colors.border.inactive} borderBottom={false} borderLeft={false} borderRight={false}>
-                <Badge color="cyan">{'<>'}</Badge>
-                <Text color={theme.colors.fg.muted}>category</Text>
                 <Badge color="cyan">↑↓</Badge>
-                <Text color={theme.colors.fg.muted}>select</Text>
-                <Badge color="green">Enter</Badge>
-                <Text color={theme.colors.fg.muted}>launch</Text>
-                <Badge color="red">^L</Badge>
+                <Text color={theme.colors.fg.muted}>nav</Text>
+                <Badge color="cyan">{'→'}</Badge>
+                <Text color={theme.colors.fg.muted}>open</Text>
+                <Badge color="cyan">{'←'}</Badge>
+                <Text color={theme.colors.fg.muted}>back</Text>
+                <Badge color="magenta">/</Badge>
+                <Text color={theme.colors.fg.muted}>search</Text>
+                <Badge color="red">ESC</Badge>
                 <Text color={theme.colors.fg.muted}>close</Text>
             </Box>
         </Box>
@@ -154,7 +432,7 @@ export const Shell: React.FC = () => {
     const { stdout } = useStdout();
     const { theme } = useSettings();
     const { windows, openWindow, closeWindow, focusNext, focusedWindowId, minimizeFocused, inputLocked } = useWindowManager();
-    const [categories, setCategories] = useState<CategoryData[]>([]);
+
     const [showLauncher, setShowLauncher] = useState(false);
     const [showWindowList, setShowWindowList] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -171,20 +449,13 @@ export const Shell: React.FC = () => {
     }, [stdout]);
 
     useEffect(() => {
-        const loadPrograms = async () => {
-            const grouped = await programLoader.getByCategories();
-            const cats: CategoryData[] = [];
-            const order = ['system', 'utility', 'other'];
-            for (const catName of order) {
-                if (grouped.has(catName)) { cats.push({ name: catName, programs: grouped.get(catName)! }); grouped.delete(catName); }
-            }
-            for (const [name, programs] of grouped) { cats.push({ name, programs }); }
-            setCategories(cats);
-            const total = cats.reduce((sum: number, c: CategoryData) => sum + c.programs.length, 0);
-            setStatus(`${total} programs`);
+        const initialize = async () => {
+            // Pre-load programs for fast launcher open
+            const programs = await programLoader.getAllProgramsFlat();
+            setStatus(`${programs.length} programs`);
             setLoading(false);
         };
-        loadPrograms();
+        initialize();
     }, []);
 
     const closeFocusedWindow = () => {
@@ -230,7 +501,7 @@ export const Shell: React.FC = () => {
                     </Box>
                 ) : showLauncher ? (
                     <Box justifyContent="center" alignItems="center" flexGrow={1}>
-                        <Launcher categories={categories} onSelect={handleLaunch} onClose={() => setShowLauncher(false)} />
+                        <Launcher onSelect={handleLaunch} onClose={() => setShowLauncher(false)} />
                     </Box>
                 ) : visibleWindows.length > 0 ? (
                     <WindowContainer />

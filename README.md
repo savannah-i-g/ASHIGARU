@@ -1,6 +1,6 @@
 # ASHIGARU
 
-![Version](https://img.shields.io/badge/version-1.0.3-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7.2-blue.svg)
@@ -133,6 +133,9 @@ Monitor network interfaces and active connections. Shows interface status, IP ad
 **System Updater**
 Check for and install ASHIGARU updates from GitHub releases. Features automatic backup creation, safe installation with rollback capability, and progress tracking. Updates preserve user configuration and API keys.
 
+**Package Manager**
+Download and install programs from GitHub releases or direct URLs. Features automatic manifest validation, folder structure preservation, conflict detection, and installed package tracking for update checking.
+
 ### Utility Programs
 
 **Terminal**
@@ -171,8 +174,13 @@ The codebase is organized into clear functional modules:
 - `index.tsx` - Application entry point
 
 **Programs Directory (`programs/`)**
-- `system/` - System-level programs (settings, updater, processes, network, system-info)
-- `utility/` - User-facing utility programs (terminal, editor, browser, notes, clock, file-browser, neorin-ai)
+- `system/` - System-level programs:
+  - `core/` - Settings, Updater, Package Manager
+  - `monitoring/` - Process Manager, Network, System Info
+- `utility/` - User-facing utility programs:
+  - `productivity/` - Notes, Editor, Task Runner
+  - `tools/` - Clock, File Browser
+  - `internet/` - Browser, NeoRin AI
 
 **Build Output (`dist/`)**
 Generated directory containing compiled JavaScript. This directory is created by the TypeScript compiler and should not be edited directly.

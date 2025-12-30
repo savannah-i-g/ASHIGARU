@@ -4,13 +4,27 @@ import { pathToFileURL } from 'url';
 import type { ProgramManifest, ProgramModule } from '../types/program.js';
 
 /**
+ * Directory contents returned by getDirectoryContents
+ */
+export interface DirectoryContents {
+    /** Current path relative to programs directory (empty string for root) */
+    currentPath: string;
+    /** Subdirectories at this level */
+    folders: string[];
+    /** Programs at this level */
+    programs: ProgramModule[];
+}
+
+/**
  * Discovers and loads program modules from the programs directory
- * Now supports nested subdirectories for categories
+ * Supports unlimited nested subdirectories for categories
  */
 export class ProgramLoader {
     private programsDir: string;
     private programs: Map<string, ProgramModule> = new Map();
     private categories: Map<string, string[]> = new Map();
+    private allPrograms: ProgramModule[] = [];
+    private discovered: boolean = false;
 
     constructor(programsDir?: string) {
         this.programsDir = programsDir || path.join(process.cwd(), 'programs');
@@ -18,61 +32,170 @@ export class ProgramLoader {
 
     /**
      * Recursively discovers all programs in the programs directory
-     * Supports: programs/category/program-name/manifest.json
+     * Supports unlimited nesting depth: programs/a/b/c/.../program-name/manifest.json
      */
     async discover(): Promise<ProgramManifest[]> {
         const manifests: ProgramManifest[] = [];
+        this.allPrograms = [];
 
         if (!fs.existsSync(this.programsDir)) {
+            this.discovered = true;
             return manifests;
         }
 
-        const topLevel = fs.readdirSync(this.programsDir, { withFileTypes: true });
+        // Recursively discover all programs
+        await this.discoverRecursive(this.programsDir, '', manifests);
+        this.discovered = true;
+        return manifests;
+    }
 
-        for (const entry of topLevel) {
+    /**
+     * Recursively discover programs in a directory
+     */
+    private async discoverRecursive(
+        dirPath: string,
+        relativePath: string,
+        manifests: ProgramManifest[]
+    ): Promise<void> {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+
+        for (const entry of entries) {
             if (!entry.isDirectory()) continue;
 
-            const categoryPath = path.join(this.programsDir, entry.name);
-            const categoryManifest = path.join(categoryPath, 'manifest.json');
+            const entryPath = path.join(dirPath, entry.name);
+            const manifestPath = path.join(entryPath, 'manifest.json');
+            const entryRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
 
-            // Check if this is a program directly in programs/ (legacy support)
-            if (fs.existsSync(categoryManifest)) {
-                const manifest = this.loadManifest(categoryManifest, categoryPath);
+            // Check if this directory contains a manifest (it's a program)
+            if (fs.existsSync(manifestPath)) {
+                const manifest = this.loadManifest(manifestPath, entryPath);
                 if (manifest) {
-                    manifest.category = manifest.category || 'other';
+                    // Store the relative path for navigation
+                    (manifest as ProgramManifest & { _relativePath?: string })._relativePath = relativePath;
+                    // Use parent directory as category if not specified
+                    manifest.category = manifest.category || relativePath.split('/').pop() || 'other';
                     manifests.push(manifest);
                 }
-                continue;
+            } else {
+                // Not a program directory, recurse into it
+                await this.discoverRecursive(entryPath, entryRelativePath, manifests);
             }
+        }
+    }
 
-            // Otherwise, treat as a category directory
-            const categoryName = entry.name;
-            const subEntries = fs.readdirSync(categoryPath, { withFileTypes: true });
+    /**
+     * Get directory contents for file explorer navigation
+     * @param relativePath Path relative to programs directory (empty string for root)
+     * @returns Folders and programs at this path level
+     */
+    async getDirectoryContents(relativePath: string = ''): Promise<DirectoryContents> {
+        // Ensure programs are discovered
+        if (!this.discovered) {
+            await this.loadAll();
+        }
 
-            for (const subEntry of subEntries) {
-                if (!subEntry.isDirectory()) continue;
+        const targetPath = relativePath
+            ? path.join(this.programsDir, relativePath)
+            : this.programsDir;
 
-                const programPath = path.join(categoryPath, subEntry.name);
-                const programManifest = path.join(programPath, 'manifest.json');
+        const result: DirectoryContents = {
+            currentPath: relativePath,
+            folders: [],
+            programs: [],
+        };
 
-                if (fs.existsSync(programManifest)) {
-                    const manifest = this.loadManifest(programManifest, programPath);
+        if (!fs.existsSync(targetPath)) {
+            return result;
+        }
+
+        const entries = fs.readdirSync(targetPath, { withFileTypes: true });
+
+        for (const entry of entries) {
+            if (!entry.isDirectory()) continue;
+
+            const entryPath = path.join(targetPath, entry.name);
+            const manifestPath = path.join(entryPath, 'manifest.json');
+
+            if (fs.existsSync(manifestPath)) {
+                // This is a program directory
+                const program = this.programs.get(
+                    this.findProgramIdByPath(relativePath, entry.name)
+                );
+                if (program) {
+                    result.programs.push(program);
+                } else {
+                    // Load it if not already loaded
+                    const manifest = this.loadManifest(manifestPath, entryPath);
                     if (manifest) {
-                        // Use directory name as category if not specified
-                        manifest.category = manifest.category || categoryName;
-                        manifests.push(manifest);
-
-                        // Track category membership
-                        if (!this.categories.has(categoryName)) {
-                            this.categories.set(categoryName, []);
+                        const loaded = await this.load(manifest.id);
+                        if (loaded) {
+                            result.programs.push(loaded);
                         }
-                        this.categories.get(categoryName)!.push(manifest.id);
                     }
                 }
+            } else {
+                // This is a folder (category/subcategory)
+                result.folders.push(entry.name);
             }
         }
 
-        return manifests;
+        // Sort folders and programs alphabetically
+        result.folders.sort((a, b) => a.localeCompare(b));
+        result.programs.sort((a, b) => a.manifest.name.localeCompare(b.manifest.name));
+
+        return result;
+    }
+
+    /**
+     * Find program ID by its path location
+     */
+    private findProgramIdByPath(relativePath: string, programDir: string): string {
+        for (const [id, program] of this.programs) {
+            const progPath = program.path;
+            const expectedPath = relativePath
+                ? path.join(this.programsDir, relativePath, programDir)
+                : path.join(this.programsDir, programDir);
+            if (progPath === expectedPath) {
+                return id;
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Get all programs as a flat list (for search)
+     */
+    async getAllProgramsFlat(): Promise<ProgramModule[]> {
+        if (!this.discovered) {
+            await this.loadAll();
+        }
+        return Array.from(this.programs.values());
+    }
+
+    /**
+     * Search programs by name or description
+     */
+    async searchPrograms(query: string): Promise<ProgramModule[]> {
+        const allPrograms = await this.getAllProgramsFlat();
+        const lowerQuery = query.toLowerCase();
+
+        return allPrograms.filter(
+            (p) =>
+                p.manifest.name.toLowerCase().includes(lowerQuery) ||
+                p.manifest.description.toLowerCase().includes(lowerQuery) ||
+                p.manifest.id.toLowerCase().includes(lowerQuery)
+        );
+    }
+
+    /**
+     * Get the relative path of a program from the programs directory
+     */
+    getProgramRelativePath(program: ProgramModule): string {
+        const relPath = path.relative(this.programsDir, program.path);
+        const parts = relPath.split(path.sep);
+        // Remove the program folder itself, return parent path
+        parts.pop();
+        return parts.join('/');
     }
 
     private loadManifest(manifestPath: string, programPath: string): ProgramManifest | null {
