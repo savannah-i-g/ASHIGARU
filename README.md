@@ -1,6 +1,6 @@
 # ASHIGARU
 
-![Version](https://img.shields.io/badge/version-1.2.5-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.6-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7.2-blue.svg)
@@ -588,7 +588,22 @@ For issues, feature requests, or questions:
 
 ## Changelog
 
-### v1.2.5 (Latest)
+### v1.2.6 (Latest)
+
+**New Features:**
+- **Space Shooter Game** - ASCII vertical scrolling shooter in `programs/games/`
+  - Dynamic viewport sizing (fills available window)
+  - 4 enemy types including erratic tracker enemy
+  - Enemy shooting mechanics
+  - Survival-based gameplay with score and timer
+  - High score persistence via `api.storage`
+  - Custom sound effects via `api.sound.playCustom()`
+  - Input locking during gameplay
+
+**Bug Fixes:**
+- Fixed `api.sound.playCustom()` not finding program sounds (added `programPath` to API context)
+
+### v1.2.5
 
 **Major Features:**
 - **Unified API System** - Programs receive an `api` prop with access to system, storage, notifications, windows, sound, and AI modules

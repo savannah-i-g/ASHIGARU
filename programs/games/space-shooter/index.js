@@ -1,47 +1,61 @@
 /**
  * Space Shooter
  * A vertical scrolling ASCII space shooter game
+ * Survive as long as possible and get the highest score!
  * Uses the ASHIGARU API for sounds, storage (high scores), and notifications
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text, useInput, useStdout } from 'ink';
 
 const h = React.createElement;
 
 // Game constants
-const VIEWPORT_WIDTH = 40;
-const VIEWPORT_HEIGHT = 20;
-const PLAYER_Y = VIEWPORT_HEIGHT - 2;
+const MIN_WIDTH = 30;
+const MIN_HEIGHT = 15;
 const SHOOT_COOLDOWN = 150; // ms
-const ENEMY_SPAWN_RATE = 1500; // ms
+const ENEMY_SPAWN_RATE = 1200; // ms
+const ENEMY_SHOOT_CHANCE = 0.02; // Chance per tick for enemy to shoot
 const GAME_TICK = 80; // ms
 const ENEMY_MOVE_INTERVAL = 3; // Move enemies every N ticks
 
-// ASCII sprites
+// ASCII sprites - simplified
 const SPRITES = {
-    player: ' /^\\ ',
-    playerWing: '<====>',
+    player: '^',
     bullet: '|',
-    enemy1: '\\V/',
-    enemy2: '<*>',
-    enemy3: '[=]',
+    enemyBullet: '!',
+    enemy1: 'V',
+    enemy2: 'W',
+    enemy3: 'M',
+    enemyErratic: 'X',
     explosion: '*',
-    powerup: '♦',
 };
 
 // Enemy types with different properties
+// type: 'normal' = straight down, 'erratic' = side-to-side + towards player
 const ENEMY_TYPES = [
-    { sprite: SPRITES.enemy1, points: 10, health: 1, color: '#ff6666' },
-    { sprite: SPRITES.enemy2, points: 20, health: 2, color: '#ffaa00' },
-    { sprite: SPRITES.enemy3, points: 30, health: 3, color: '#ff00ff' },
+    { sprite: SPRITES.enemy1, points: 10, health: 1, color: '#ff6666', shootChance: 0.01, type: 'normal' },
+    { sprite: SPRITES.enemy2, points: 20, health: 2, color: '#ffaa00', shootChance: 0.02, type: 'normal' },
+    { sprite: SPRITES.enemy3, points: 30, health: 3, color: '#ff00ff', shootChance: 0.03, type: 'normal' },
+    { sprite: SPRITES.enemyErratic, points: 40, health: 2, color: '#00ff00', shootChance: 0.015, type: 'erratic' },
 ];
 
 const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) => {
+    // Get terminal dimensions
+    const { stdout } = useStdout();
+    const termWidth = stdout?.columns || 80;
+    const termHeight = stdout?.rows || 24;
+
+    // Calculate viewport size (leave room for borders and UI)
+    const viewportWidth = Math.max(MIN_WIDTH, termWidth - 6);
+    const viewportHeight = Math.max(MIN_HEIGHT, termHeight - 8);
+    const playerY = viewportHeight - 2;
+
     // Game state
     const [gameState, setGameState] = useState('menu'); // menu, playing, paused, gameover
-    const [playerX, setPlayerX] = useState(Math.floor(VIEWPORT_WIDTH / 2) - 3);
+    const [playerX, setPlayerX] = useState(Math.floor(viewportWidth / 2));
     const [bullets, setBullets] = useState([]);
+    const [enemyBullets, setEnemyBullets] = useState([]);
     const [enemies, setEnemies] = useState([]);
     const [explosions, setExplosions] = useState([]);
     const [score, setScore] = useState(0);
@@ -49,11 +63,34 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
     const [highScore, setHighScore] = useState(0);
     const [level, setLevel] = useState(1);
     const [tickCount, setTickCount] = useState(0);
+    const [survivalTime, setSurvivalTime] = useState(0);
 
+    // Refs for game loop
     const lastShot = useRef(0);
-    const gameLoop = useRef(null);
-    const enemySpawner = useRef(null);
+    const gameLoopRef = useRef(null);
     const inputLocked = useRef(false);
+    const lastSpawn = useRef(0);
+    const gameStartTime = useRef(0);
+
+    // Game state refs for use in intervals
+    const gameStateRef = useRef(gameState);
+    const levelRef = useRef(level);
+    const scoreRef = useRef(score);
+    const livesRef = useRef(lives);
+    const playerXRef = useRef(playerX);
+    const viewportWidthRef = useRef(viewportWidth);
+    const viewportHeightRef = useRef(viewportHeight);
+    const playerYRef = useRef(playerY);
+
+    // Keep refs in sync
+    useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
+    useEffect(() => { levelRef.current = level; }, [level]);
+    useEffect(() => { scoreRef.current = score; }, [score]);
+    useEffect(() => { livesRef.current = lives; }, [lives]);
+    useEffect(() => { playerXRef.current = playerX; }, [playerX]);
+    useEffect(() => { viewportWidthRef.current = viewportWidth; }, [viewportWidth]);
+    useEffect(() => { viewportHeightRef.current = viewportHeight; }, [viewportHeight]);
+    useEffect(() => { playerYRef.current = playerY; }, [playerY]);
 
     // Load high score on mount
     useEffect(() => {
@@ -79,162 +116,243 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
         }
     }, [api]);
 
-    // Spawn enemy
-    const spawnEnemy = useCallback(() => {
-        const typeIndex = Math.min(
-            Math.floor(Math.random() * Math.min(level, ENEMY_TYPES.length)),
-            ENEMY_TYPES.length - 1
-        );
-        const enemyType = ENEMY_TYPES[typeIndex];
-        const x = Math.floor(Math.random() * (VIEWPORT_WIDTH - 5)) + 1;
-
-        setEnemies(prev => [...prev, {
-            id: Date.now() + Math.random(),
-            x,
-            y: 0,
-            ...enemyType,
-        }]);
-    }, [level]);
-
     // Shoot bullet
     const shoot = useCallback(() => {
         const now = Date.now();
         if (now - lastShot.current < SHOOT_COOLDOWN) return;
         lastShot.current = now;
 
+        const px = playerXRef.current;
+        const py = playerYRef.current;
+
         setBullets(prev => [...prev, {
             id: Date.now(),
-            x: playerX + 3,
-            y: PLAYER_Y - 1,
+            x: px,
+            y: py - 1,
         }]);
 
         playSound('shoot');
-    }, [playerX, playSound]);
+    }, [playSound]);
 
-    // Create explosion
-    const createExplosion = useCallback((x, y) => {
-        const id = Date.now() + Math.random();
-        setExplosions(prev => [...prev, { id, x, y, frame: 0 }]);
-        setTimeout(() => {
-            setExplosions(prev => prev.filter(e => e.id !== id));
-        }, 300);
-    }, []);
-
-    // Game tick
-    const gameTick = useCallback(() => {
-        setTickCount(prev => prev + 1);
-
-        // Move bullets up
-        setBullets(prev => prev
-            .map(b => ({ ...b, y: b.y - 1 }))
-            .filter(b => b.y >= 0)
-        );
-
-        // Move enemies down (slower than bullets)
-        setEnemies(prev => {
-            if (tickCount % ENEMY_MOVE_INTERVAL !== 0) return prev;
-            return prev.map(e => ({ ...e, y: e.y + 1 }));
-        });
-
-        // Check collisions
-        setBullets(prevBullets => {
-            const remainingBullets = [];
-            let bulletsToRemove = new Set();
-
-            prevBullets.forEach(bullet => {
-                let hit = false;
-                setEnemies(prevEnemies => {
-                    return prevEnemies.map(enemy => {
-                        if (hit) return enemy;
-                        // Check collision
-                        const bulletHit = Math.abs(bullet.x - enemy.x - 1) <= 2 &&
-                            Math.abs(bullet.y - enemy.y) <= 1;
-                        if (bulletHit) {
-                            hit = true;
-                            bulletsToRemove.add(bullet.id);
-                            const newHealth = enemy.health - 1;
-                            if (newHealth <= 0) {
-                                createExplosion(enemy.x, enemy.y);
-                                playSound('explosion');
-                                setScore(s => s + enemy.points);
-                                return null; // Remove enemy
-                            }
-                            return { ...enemy, health: newHealth };
-                        }
-                        return enemy;
-                    }).filter(Boolean);
-                });
-            });
-
-            return prevBullets.filter(b => !bulletsToRemove.has(b.id));
-        });
-
-        // Check if enemies reached bottom or hit player
-        setEnemies(prev => {
-            const remaining = [];
-            prev.forEach(enemy => {
-                if (enemy.y >= VIEWPORT_HEIGHT - 1) {
-                    // Enemy reached bottom - lose a life
-                    setLives(l => {
-                        const newLives = l - 1;
-                        if (newLives <= 0) {
-                            setGameState('gameover');
-                            playSound('gameover');
-                        } else {
-                            playSound('hit');
-                        }
-                        return newLives;
-                    });
-                } else if (enemy.y >= PLAYER_Y - 1 &&
-                    Math.abs(enemy.x - playerX) < 4) {
-                    // Enemy hit player
-                    createExplosion(enemy.x, enemy.y);
-                    playSound('hit');
-                    setLives(l => {
-                        const newLives = l - 1;
-                        if (newLives <= 0) {
-                            setGameState('gameover');
-                            playSound('gameover');
-                        }
-                        return newLives;
-                    });
-                } else {
-                    remaining.push(enemy);
-                }
-            });
-            return remaining;
-        });
-
-        // Level up every 200 points
-        setLevel(Math.floor(score / 200) + 1);
-
-    }, [tickCount, playerX, createExplosion, playSound, score]);
-
-    // Start game loop
+    // Game loop - runs every GAME_TICK ms
     useEffect(() => {
-        if (gameState === 'playing') {
-            // Lock input during gameplay to prevent global shortcuts
-            if (!inputLocked.current && lockInput) {
-                lockInput();
-                inputLocked.current = true;
-            }
+        if (gameState !== 'playing') return;
 
-            gameLoop.current = setInterval(gameTick, GAME_TICK);
-            enemySpawner.current = setInterval(spawnEnemy,
-                Math.max(500, ENEMY_SPAWN_RATE - level * 100));
-
-            return () => {
-                clearInterval(gameLoop.current);
-                clearInterval(enemySpawner.current);
-            };
-        } else {
-            // Unlock input when not playing
-            if (inputLocked.current && unlockInput) {
-                unlockInput();
-                inputLocked.current = false;
-            }
+        // Lock input during gameplay
+        if (!inputLocked.current && lockInput) {
+            lockInput();
+            inputLocked.current = true;
         }
-    }, [gameState, gameTick, spawnEnemy, level, lockInput, unlockInput]);
+
+        let tickCounter = 0;
+
+        const gameLoop = () => {
+            tickCounter++;
+            setTickCount(tickCounter);
+
+            // Update survival time
+            setSurvivalTime(Math.floor((Date.now() - gameStartTime.current) / 1000));
+
+            // Spawn enemies periodically
+            const now = Date.now();
+            const spawnRate = Math.max(600, ENEMY_SPAWN_RATE - levelRef.current * 80);
+            if (now - lastSpawn.current > spawnRate) {
+                lastSpawn.current = now;
+                const currentLevel = levelRef.current;
+                const currentWidth = viewportWidthRef.current;
+                const typeIndex = Math.min(
+                    Math.floor(Math.random() * Math.min(currentLevel, ENEMY_TYPES.length)),
+                    ENEMY_TYPES.length - 1
+                );
+                const enemyType = ENEMY_TYPES[typeIndex];
+                const x = Math.floor(Math.random() * (currentWidth - 4)) + 2;
+
+                setEnemies(prev => [...prev, {
+                    id: now + Math.random(),
+                    x,
+                    y: 0,
+                    ...enemyType,
+                }]);
+            }
+
+            // Move player bullets up
+            setBullets(prev => prev
+                .map(b => ({ ...b, y: b.y - 1 }))
+                .filter(b => b.y >= 0)
+            );
+
+            // Move enemy bullets down
+            setEnemyBullets(prev => prev
+                .map(b => ({ ...b, y: b.y + 1 }))
+                .filter(b => b.y < viewportHeightRef.current)
+            );
+
+            // Move enemies (slower than bullets)
+            if (tickCounter % ENEMY_MOVE_INTERVAL === 0) {
+                const currentPlayerX = playerXRef.current;
+                const currentWidth = viewportWidthRef.current;
+
+                setEnemies(prev => prev.map(e => {
+                    if (e.type === 'erratic') {
+                        // Erratic movement: 2 random moves per 4 dedicated towards player
+                        const moveCounter = (e.moveCounter || 0) + 1;
+                        let newX = e.x;
+                        let newY = e.y;
+
+                        if (moveCounter % 3 === 0) {
+                            // Random horizontal movement
+                            const randomMove = Math.floor(Math.random() * 5) - 2; // -2 to +2
+                            newX = Math.max(1, Math.min(currentWidth - 2, e.x + randomMove));
+                        } else {
+                            // Move towards player horizontally
+                            if (currentPlayerX > e.x) {
+                                newX = Math.min(currentWidth - 2, e.x + 1);
+                            } else if (currentPlayerX < e.x) {
+                                newX = Math.max(1, e.x - 1);
+                            }
+                        }
+
+                        // Always move down (but slower - every other move tick)
+                        if (moveCounter % 2 === 0) {
+                            newY = e.y + 1;
+                        }
+
+                        return { ...e, x: newX, y: newY, moveCounter };
+                    } else {
+                        // Normal enemies just move straight down
+                        return { ...e, y: e.y + 1 };
+                    }
+                }));
+            }
+
+            // Enemies shoot at player
+            setEnemies(prev => {
+                prev.forEach(enemy => {
+                    if (Math.random() < (enemy.shootChance || ENEMY_SHOOT_CHANCE)) {
+                        setEnemyBullets(bullets => [...bullets, {
+                            id: Date.now() + Math.random(),
+                            x: enemy.x,
+                            y: enemy.y + 1,
+                        }]);
+                    }
+                });
+                return prev;
+            });
+
+            // Check player bullet-enemy collisions
+            setBullets(prevBullets => {
+                const bulletsToRemove = new Set();
+
+                prevBullets.forEach(bullet => {
+                    setEnemies(prevEnemies => {
+                        return prevEnemies.map(enemy => {
+                            if (bulletsToRemove.has(bullet.id)) return enemy;
+                            const hit = Math.abs(bullet.x - enemy.x) <= 1 &&
+                                Math.abs(bullet.y - enemy.y) <= 1;
+                            if (hit) {
+                                bulletsToRemove.add(bullet.id);
+                                const newHealth = enemy.health - 1;
+                                if (newHealth <= 0) {
+                                    // Create explosion
+                                    const expId = Date.now() + Math.random();
+                                    setExplosions(prev => [...prev, { id: expId, x: enemy.x, y: enemy.y }]);
+                                    setTimeout(() => {
+                                        setExplosions(prev => prev.filter(e => e.id !== expId));
+                                    }, 200);
+                                    playSound('explosion');
+                                    setScore(s => s + enemy.points);
+                                    return null;
+                                }
+                                return { ...enemy, health: newHealth };
+                            }
+                            return enemy;
+                        }).filter(Boolean);
+                    });
+                });
+
+                return prevBullets.filter(b => !bulletsToRemove.has(b.id));
+            });
+
+            // Check enemy bullets hitting player
+            const currentPlayerX = playerXRef.current;
+            const currentPlayerY = playerYRef.current;
+
+            setEnemyBullets(prev => {
+                const remaining = [];
+                prev.forEach(bullet => {
+                    if (Math.abs(bullet.x - currentPlayerX) <= 1 &&
+                        Math.abs(bullet.y - currentPlayerY) <= 1) {
+                        // Player hit by enemy bullet
+                        playSound('hit');
+                        setLives(l => {
+                            const newLives = l - 1;
+                            if (newLives <= 0) {
+                                setGameState('gameover');
+                                playSound('gameover');
+                            }
+                            return newLives;
+                        });
+                    } else {
+                        remaining.push(bullet);
+                    }
+                });
+                return remaining;
+            });
+
+            // Check enemy-player physical collisions (remove enemies that go off screen)
+            const currentHeight = viewportHeightRef.current;
+
+            setEnemies(prev => {
+                const remaining = [];
+                prev.forEach(enemy => {
+                    if (enemy.y >= currentHeight) {
+                        // Enemy passed bottom - just remove, no penalty
+                        return;
+                    } else if (enemy.y >= currentPlayerY - 1 && Math.abs(enemy.x - currentPlayerX) <= 1) {
+                        // Enemy physically hit player
+                        const expId = Date.now() + Math.random();
+                        setExplosions(exps => [...exps, { id: expId, x: enemy.x, y: enemy.y }]);
+                        setTimeout(() => {
+                            setExplosions(exps => exps.filter(e => e.id !== expId));
+                        }, 200);
+                        playSound('hit');
+                        setLives(l => {
+                            const newLives = l - 1;
+                            if (newLives <= 0) {
+                                setGameState('gameover');
+                                playSound('gameover');
+                            }
+                            return newLives;
+                        });
+                    } else {
+                        remaining.push(enemy);
+                    }
+                });
+                return remaining;
+            });
+
+            // Level up based on survival time (every 30 seconds)
+            setLevel(Math.floor((Date.now() - gameStartTime.current) / 30000) + 1);
+        };
+
+        gameLoopRef.current = setInterval(gameLoop, GAME_TICK);
+        lastSpawn.current = Date.now();
+        gameStartTime.current = Date.now();
+
+        return () => {
+            if (gameLoopRef.current) {
+                clearInterval(gameLoopRef.current);
+            }
+        };
+    }, [gameState, lockInput, playSound]);
+
+    // Unlock input when not playing
+    useEffect(() => {
+        if (gameState !== 'playing' && inputLocked.current && unlockInput) {
+            unlockInput();
+            inputLocked.current = false;
+        }
+    }, [gameState, unlockInput]);
 
     // Start new game
     const startGame = useCallback(() => {
@@ -243,12 +361,16 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
         setLives(3);
         setLevel(1);
         setBullets([]);
+        setEnemyBullets([]);
         setEnemies([]);
         setExplosions([]);
-        setPlayerX(Math.floor(VIEWPORT_WIDTH / 2) - 3);
+        setPlayerX(Math.floor(viewportWidth / 2));
         setTickCount(0);
+        setSurvivalTime(0);
+        lastSpawn.current = 0;
+        gameStartTime.current = Date.now();
         api?.sound?.click();
-    }, [api]);
+    }, [api, viewportWidth]);
 
     // Handle input
     useInput((input, key) => {
@@ -260,7 +382,6 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
             } else if (gameState === 'paused') {
                 setGameState('playing');
             } else {
-                // Ensure input is unlocked before closing
                 if (inputLocked.current && unlockInput) {
                     unlockInput();
                     inputLocked.current = false;
@@ -286,10 +407,10 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
 
         if (gameState === 'playing') {
             if (key.leftArrow || input === 'a') {
-                setPlayerX(x => Math.max(0, x - 2));
+                setPlayerX(x => Math.max(1, x - 2));
             }
             if (key.rightArrow || input === 'd') {
-                setPlayerX(x => Math.min(VIEWPORT_WIDTH - 7, x + 2));
+                setPlayerX(x => Math.min(viewportWidth - 2, x + 2));
             }
             if (input === ' ' || key.upArrow) {
                 shoot();
@@ -299,69 +420,59 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
 
     // Render game viewport
     const renderViewport = () => {
-        // Create empty viewport
-        const viewport = Array(VIEWPORT_HEIGHT).fill(null).map(() =>
-            Array(VIEWPORT_WIDTH).fill({ char: ' ', color: '#333333' })
+        const viewport = Array(viewportHeight).fill(null).map(() =>
+            Array(viewportWidth).fill({ char: ' ', color: '#111111' })
         );
 
-        // Draw stars (background)
-        for (let i = 0; i < 15; i++) {
-            const starX = (i * 7 + tickCount) % VIEWPORT_WIDTH;
-            const starY = (i * 3 + Math.floor(tickCount / 2)) % VIEWPORT_HEIGHT;
-            if (starY < VIEWPORT_HEIGHT && starX < VIEWPORT_WIDTH) {
-                viewport[starY][starX] = { char: '.', color: '#444444' };
+        // Draw stars
+        for (let i = 0; i < Math.floor(viewportWidth / 3); i++) {
+            const starX = (i * 7 + tickCount) % viewportWidth;
+            const starY = (i * 3 + Math.floor(tickCount / 2)) % viewportHeight;
+            if (starY < viewportHeight && starX < viewportWidth) {
+                viewport[starY][starX] = { char: '.', color: '#333333' };
             }
         }
 
         // Draw enemies
         enemies.forEach(enemy => {
-            const sprite = enemy.sprite;
-            for (let i = 0; i < sprite.length; i++) {
-                const x = enemy.x + i;
-                const y = Math.floor(enemy.y);
-                if (x >= 0 && x < VIEWPORT_WIDTH && y >= 0 && y < VIEWPORT_HEIGHT) {
-                    viewport[y][x] = { char: sprite[i], color: enemy.color };
-                }
+            const x = Math.floor(enemy.x);
+            const y = Math.floor(enemy.y);
+            if (x >= 0 && x < viewportWidth && y >= 0 && y < viewportHeight) {
+                viewport[y][x] = { char: enemy.sprite, color: enemy.color };
             }
         });
 
-        // Draw bullets
+        // Draw player bullets
         bullets.forEach(bullet => {
+            const x = Math.floor(bullet.x);
             const y = Math.floor(bullet.y);
-            if (bullet.x >= 0 && bullet.x < VIEWPORT_WIDTH && y >= 0 && y < VIEWPORT_HEIGHT) {
-                viewport[y][bullet.x] = { char: SPRITES.bullet, color: '#ffff00' };
+            if (x >= 0 && x < viewportWidth && y >= 0 && y < viewportHeight) {
+                viewport[y][x] = { char: SPRITES.bullet, color: '#ffff00' };
+            }
+        });
+
+        // Draw enemy bullets
+        enemyBullets.forEach(bullet => {
+            const x = Math.floor(bullet.x);
+            const y = Math.floor(bullet.y);
+            if (x >= 0 && x < viewportWidth && y >= 0 && y < viewportHeight) {
+                viewport[y][x] = { char: SPRITES.enemyBullet, color: '#ff4444' };
             }
         });
 
         // Draw explosions
         explosions.forEach(exp => {
-            const chars = ['*', '+', 'X', 'o'];
-            const char = chars[Math.floor(Math.random() * chars.length)];
-            for (let dx = -1; dx <= 1; dx++) {
-                for (let dy = -1; dy <= 1; dy++) {
-                    const x = exp.x + dx;
-                    const y = exp.y + dy;
-                    if (x >= 0 && x < VIEWPORT_WIDTH && y >= 0 && y < VIEWPORT_HEIGHT) {
-                        viewport[y][x] = { char, color: '#ff8800' };
-                    }
-                }
+            const x = Math.floor(exp.x);
+            const y = Math.floor(exp.y);
+            if (x >= 0 && x < viewportWidth && y >= 0 && y < viewportHeight) {
+                viewport[y][x] = { char: SPRITES.explosion, color: '#ff8800' };
             }
         });
 
         // Draw player
-        const playerSprite1 = SPRITES.player;
-        const playerSprite2 = SPRITES.playerWing;
-        for (let i = 0; i < playerSprite1.length; i++) {
-            const x = playerX + i;
-            if (x >= 0 && x < VIEWPORT_WIDTH) {
-                viewport[PLAYER_Y - 1][x] = { char: playerSprite1[i], color: '#00ffff' };
-            }
-        }
-        for (let i = 0; i < playerSprite2.length; i++) {
-            const x = playerX + i;
-            if (x >= 0 && x < VIEWPORT_WIDTH) {
-                viewport[PLAYER_Y][x] = { char: playerSprite2[i], color: '#00ffff' };
-            }
+        const px = Math.floor(playerX);
+        if (px >= 0 && px < viewportWidth && playerY >= 0 && playerY < viewportHeight) {
+            viewport[playerY][px] = { char: SPRITES.player, color: '#00ffff' };
         }
 
         // Convert to renderable lines
@@ -370,7 +481,7 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
             let currentColor = null;
             let currentText = '';
 
-            row.forEach((cell, x) => {
+            row.forEach((cell) => {
                 if (cell.color !== currentColor) {
                     if (currentText) {
                         segments.push({ text: currentText, color: currentColor });
@@ -393,58 +504,65 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
         });
     };
 
+    // Format time as MM:SS
+    const formatTime = (seconds) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    };
+
     // Render menu
     const renderMenu = () => {
-        return h(Box, { flexDirection: 'column', alignItems: 'center', paddingY: 2 },
-            h(Text, { color: '#00ffff', bold: true }, '╔═══════════════════════════════════╗'),
-            h(Text, { color: '#00ffff', bold: true }, '║       S P A C E   S H O O T E R   ║'),
-            h(Text, { color: '#00ffff', bold: true }, '╚═══════════════════════════════════╝'),
+        return h(Box, { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
+            h(Text, { color: '#00ffff', bold: true }, '═══ SPACE SHOOTER ═══'),
             h(Text, null, ''),
-            h(Text, { color: '#888888' }, '         /^\\'),
-            h(Text, { color: '#00ffff' }, '        <====>'),
+            h(Text, { color: '#00ffff', bold: true }, '  ^'),
+            h(Text, { color: '#888888' }, ' /|\\'),
             h(Text, null, ''),
             h(Text, { color: '#ffff00' }, 'High Score: ' + highScore),
             h(Text, null, ''),
-            h(Text, { color: '#ffffff' }, '← → or A D  -  Move'),
-            h(Text, { color: '#ffffff' }, 'SPACE or ↑  -  Shoot'),
-            h(Text, { color: '#ffffff' }, '   ESC      -  Pause/Quit'),
+            h(Text, { color: '#aaaaaa' }, 'Survive as long as you can!'),
+            h(Text, { color: '#aaaaaa' }, 'Dodge enemies and their shots.'),
             h(Text, null, ''),
-            h(Text, { color: '#00ff00', bold: true }, '[ Press SPACE to Start ]')
+            h(Text, { color: '#ffffff' }, '←/→ or A/D  Move'),
+            h(Text, { color: '#ffffff' }, 'SPACE or ↑  Shoot'),
+            h(Text, { color: '#ffffff' }, 'ESC         Pause'),
+            h(Text, null, ''),
+            h(Text, { color: '#00ff00', bold: true }, '[ SPACE to Start ]')
         );
     };
 
     // Render game over
     const renderGameOver = () => {
         const isNewHighScore = score >= highScore && score > 0;
-        return h(Box, { flexDirection: 'column', alignItems: 'center', paddingY: 2 },
-            h(Text, { color: '#ff0000', bold: true }, '╔═══════════════════════════════════╗'),
-            h(Text, { color: '#ff0000', bold: true }, '║          G A M E   O V E R        ║'),
-            h(Text, { color: '#ff0000', bold: true }, '╚═══════════════════════════════════╝'),
+        return h(Box, { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
+            h(Text, { color: '#ff0000', bold: true }, '═══ GAME OVER ═══'),
             h(Text, null, ''),
             isNewHighScore && h(Text, { color: '#ffff00', bold: true }, '★ NEW HIGH SCORE! ★'),
             h(Text, null, ''),
-            h(Text, { color: '#ffffff' }, 'Final Score: ' + score),
-            h(Text, { color: '#888888' }, 'Level Reached: ' + level),
+            h(Text, { color: '#ffffff' }, 'Score: ' + score),
+            h(Text, { color: '#888888' }, 'Survived: ' + formatTime(survivalTime)),
+            h(Text, { color: '#888888' }, 'Level: ' + level),
             h(Text, null, ''),
-            h(Text, { color: '#00ff00', bold: true }, '[ Press SPACE to Play Again ]'),
-            h(Text, { color: '#888888' }, 'ESC to exit')
+            h(Text, { color: '#00ff00', bold: true }, '[ SPACE to Retry ]'),
+            h(Text, { color: '#555555' }, 'ESC to exit')
         );
     };
 
     // Render pause screen
     const renderPaused = () => {
-        return h(Box, { flexDirection: 'column', alignItems: 'center', paddingY: 4 },
-            h(Text, { color: '#ffff00', bold: true }, '║  P A U S E D  ║'),
+        return h(Box, { flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexGrow: 1 },
+            h(Text, { color: '#ffff00', bold: true }, '═══ PAUSED ═══'),
             h(Text, null, ''),
             h(Text, { color: '#ffffff' }, 'Score: ' + score),
+            h(Text, { color: '#ffffff' }, 'Time: ' + formatTime(survivalTime)),
             h(Text, { color: '#ffffff' }, 'Lives: ' + '❤'.repeat(lives)),
             h(Text, null, ''),
-            h(Text, { color: '#00ff00' }, '[ Press SPACE to Resume ]'),
-            h(Text, { color: '#888888' }, 'ESC to quit')
+            h(Text, { color: '#00ff00' }, '[ SPACE to Resume ]'),
+            h(Text, { color: '#555555' }, 'ESC to quit')
         );
     };
 
-    // Main render
     const borderColor = isFocused ? '#00ffff' : '#333333';
 
     return h(Box, {
@@ -452,32 +570,22 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
         borderStyle: 'single',
         borderColor,
         flexGrow: 1,
-        width: VIEWPORT_WIDTH + 4
+        width: '100%',
+        height: '100%'
     },
-        // Header
-        h(Box, {
-            paddingX: 1,
-            justifyContent: 'space-between',
-            borderStyle: 'single',
-            borderColor: '#333333',
-            borderTop: false,
-            borderLeft: false,
-            borderRight: false,
-        },
-            h(Text, { color: '#00ffff', bold: true }, '🚀 SPACE SHOOTER'),
+        h(Box, { paddingX: 1, justifyContent: 'space-between' },
+            h(Text, { color: '#00ffff', bold: true }, 'SPACE SHOOTER'),
             gameState === 'playing' && h(Box, { gap: 2 },
-                h(Text, { color: '#ffff00' }, 'Score: ' + score),
+                h(Text, { color: '#ffff00' }, 'Score:' + score),
+                h(Text, { color: '#00ff00' }, formatTime(survivalTime)),
                 h(Text, { color: '#ff6666' }, '❤'.repeat(lives)),
-                h(Text, { color: '#888888' }, 'Lv.' + level)
+                h(Text, { color: '#888888' }, 'Lv' + level)
             )
         ),
-
-        // Game area
         h(Box, {
             flexDirection: 'column',
-            paddingX: 1,
-            minHeight: VIEWPORT_HEIGHT + 2,
-            justifyContent: 'center',
+            flexGrow: 1,
+            justifyContent: gameState !== 'playing' ? 'center' : 'flex-start',
             alignItems: gameState !== 'playing' ? 'center' : 'flex-start'
         },
             gameState === 'menu' && renderMenu(),
@@ -485,19 +593,10 @@ const Program = ({ isFocused, onClose, api, windowId, lockInput, unlockInput }) 
             gameState === 'paused' && renderPaused(),
             gameState === 'gameover' && renderGameOver()
         ),
-
-        // Footer
-        h(Box, {
-            paddingX: 1,
-            borderStyle: 'single',
-            borderColor: '#333333',
-            borderBottom: false,
-            borderLeft: false,
-            borderRight: false,
-        },
-            h(Text, { color: '#555555' },
+        h(Box, { paddingX: 1 },
+            h(Text, { color: '#444444' },
                 gameState === 'playing'
-                    ? '←/→ Move  SPACE Shoot  ESC Pause'
+                    ? '←→ Move  SPACE Shoot  ESC Pause'
                     : 'SPACE Start  ESC Exit'
             )
         )
