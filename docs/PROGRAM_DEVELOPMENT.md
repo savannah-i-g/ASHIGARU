@@ -10,6 +10,8 @@ A comprehensive guide for creating, packaging, and distributing programs for the
 - [Manifest Format](#manifest-format)
 - [Entry File Requirements](#entry-file-requirements)
 - [Complete API Reference](#complete-api-reference)
+- [IPC System](#ipc-system)
+- [Unified API System](#unified-api-system)
 - [State Persistence](#state-persistence)
 - [Sound System](#sound-system)
 - [Available Ink Components](#available-ink-components)
@@ -144,6 +146,9 @@ Your program receives all props defined in the `ProgramProps` interface. The mos
 | `onClose` | function | Call to close the program window |
 | `onFocus` | function | Call to request focus for this window |
 | `manifest` | object | The program's manifest data |
+| `windowId` | string | Unique ID for this window instance |
+| `ipc` | IPCContextType | Inter-program communication (see [IPC System](#ipc-system)) |
+| `api` | ProgramAPI | Unified API for system features (see [Unified API System](#unified-api-system)) |
 
 For the complete API including settings, theming, and advanced features, see [Complete API Reference](#complete-api-reference).
 
@@ -723,6 +728,95 @@ To test your implementation:
 - Add version field to state
 - Validate state structure before restoring
 - Provide migration logic for old versions
+
+---
+
+## IPC System
+
+ASHIGARU includes an Inter-Process Communication system enabling programs to communicate with each other.
+
+### Quick Start
+
+```javascript
+const MyProgram = ({ ipc, windowId }) => {
+    // Publish to channel
+    ipc.publish('myapp.events', 'status', { value: 42 });
+
+    // Subscribe to channel
+    ipc.subscribe('other.events', (msg) => console.log(msg.payload));
+
+    // Register a callable service
+    ipc.registerService('myservice', {
+        getData: async () => ({ result: 'hello' })
+    });
+
+    // Call another program's service
+    const result = await ipc.callService('calculator', 'add', 5, 3);
+};
+```
+
+### Available Methods
+
+| Method | Description |
+|--------|-------------|
+| `publish(channel, type, payload)` | Broadcast message to subscribers |
+| `subscribe(channel, handler)` | Listen to channel messages |
+| `sendToWindow(windowId, type, payload)` | Direct message to specific window |
+| `onDirectMessage(handler)` | Listen for direct messages |
+| `registerService(name, methods)` | Register callable functions |
+| `callService(name, method, ...args)` | Call a registered service |
+| `request(channel, type, payload, timeout)` | Send request and await response |
+
+For complete IPC documentation, see **[docs/IPC.md](IPC.md)**
+
+---
+
+## Unified API System
+
+Programs receive an `api` prop providing unified access to system features.
+
+### Quick Start
+
+```javascript
+const MyProgram = ({ api }) => {
+    // System info
+    const stats = api.system.getStats();
+
+    // Persistent storage
+    await api.storage.set('key', value);
+    const data = await api.storage.get('key');
+
+    // Notifications
+    api.notifications.success('Saved!');
+
+    // Window management
+    api.windows.list();
+    api.windows.minimize();
+
+    // Sounds (including custom program sounds)
+    api.sound.click();
+    api.sound.playCustom('alert.mp3'); // from program's /sounds folder
+
+    // AI (if configured)
+    if (api.ai.isAvailable()) {
+        const answer = await api.ai.ask('Question?');
+    }
+};
+```
+
+### Available Modules
+
+| Module | Description |
+|--------|-------------|
+| `api.system` | System stats, events, hostname, uptime |
+| `api.storage` | Persistent key-value storage per program |
+| `api.notifications` | Toast notifications (success, error, warning, info) |
+| `api.windows` | Window management and direct messaging |
+| `api.sound` | System sounds + custom program sounds |
+| `api.ai` | AI/LLM capabilities |
+| `api.ipc` | Raw IPC access |
+
+For complete API documentation, see **[docs/API.md](API.md)**
 
 ---
 
