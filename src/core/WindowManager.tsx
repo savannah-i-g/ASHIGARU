@@ -340,6 +340,7 @@ export const WindowContainer: React.FC = () => {
                         isFocused: w.isFocused,
                         isMinimized: w.isMinimized,
                     })),
+                    programPath: window.program.path,
                 };
                 contexts.set(window.id, apiManager.createWindowAPI(window.id, window.program.manifest.id, apiContext));
             }
