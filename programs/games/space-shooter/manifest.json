@@ -1,0 +1,10 @@
+{
+    "id": "space-shooter",
+    "name": "Space Shooter",
+    "version": "1.0.0",
+    "description": "A vertical scrolling ASCII space shooter game",
+    "author": "ASHIGARU",
+    "icon": "🚀",
+    "category": "games",
+    "entry": "index.js"
+}
