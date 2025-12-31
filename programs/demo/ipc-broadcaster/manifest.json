@@ -1,0 +1,10 @@
+{
+    "id": "ipc-broadcaster",
+    "name": "IPC Broadcaster",
+    "version": "1.0.0",
+    "description": "Demo program that broadcasts messages and exposes services via IPC",
+    "author": "ASHIGARU",
+    "icon": "📢",
+    "category": "demo",
+    "entry": "index.js"
+}

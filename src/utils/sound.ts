@@ -106,10 +106,50 @@ export const playError = (soundsEnabled: boolean): void => {
     playSound('error', soundsEnabled);
 };
 
+/**
+ * Play a custom sound file from any path
+ * @param filePath - Absolute path to the sound file
+ * @param soundsEnabled - Whether sounds are enabled in settings
+ */
+export const playSoundFile = async (filePath: string, soundsEnabled: boolean): Promise<void> => {
+    // Don't play if sounds are disabled
+    if (!soundsEnabled) return;
+
+    // Initialize player on first use
+    if (!initPlayer()) return;
+    if (!player) return;
+
+    try {
+        // Fire and forget - don't await to avoid blocking UI
+        player.play(filePath).catch(() => {
+            // Silently ignore playback errors (file not found, etc.)
+        });
+    } catch {
+        // Silently ignore errors
+    }
+};
+
+/**
+ * Play a sound from a program's sounds directory
+ * @param programPath - Absolute path to the program directory
+ * @param filename - Sound filename (e.g., 'beep.mp3', 'alert.wav')
+ * @param soundsEnabled - Whether sounds are enabled in settings
+ */
+export const playProgramSound = async (
+    programPath: string,
+    filename: string,
+    soundsEnabled: boolean
+): Promise<void> => {
+    const soundPath = path.join(programPath, 'sounds', filename);
+    return playSoundFile(soundPath, soundsEnabled);
+};
+
 export default {
     playSound,
     playClick,
     playHover,
     playSuccess,
     playError,
+    playSoundFile,
+    playProgramSound,
 };
