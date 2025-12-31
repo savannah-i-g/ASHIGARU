@@ -1,0 +1,10 @@
+{
+    "id": "ipc-monitor",
+    "name": "IPC Monitor",
+    "version": "1.0.0",
+    "description": "Real-time monitor for IPC channels, services, and messages",
+    "author": "ASHIGARU",
+    "icon": "📡",
+    "category": "demo",
+    "entry": "index.js"
+}

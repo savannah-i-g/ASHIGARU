@@ -1,9 +1,12 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Box } from 'ink';
 import type { ProgramModule, WindowInstance } from '../types/program.js';
 import { useSettings } from './SettingsContext.js';
 import { stateManager } from './StateManager.js';
 import { playSound } from '../utils/sound.js';
+import { createWindowIPC, cleanupWindowIPC } from './IPCContext.js';
+import { apiManager } from './api/APIManager.js';
+import type { APICreationContext, WindowInfo } from './api/types.js';
 
 interface WindowManagerContextType {
     /** Currently open windows */
@@ -117,6 +120,8 @@ export const WindowManagerProvider: React.FC<WindowManagerProviderProps> = ({
             // Clear saved state for this program when explicitly closing
             if (closingWindow) {
                 stateManager.clearState(closingWindow.program.manifest.id);
+                // Clean up IPC resources for this window
+                cleanupWindowIPC(windowId);
             }
 
             // Remove window state from map
@@ -302,10 +307,45 @@ export const useWindowManager = (): WindowManagerContextType => {
  * Renders all open, non-minimized windows in a tiled layout
  */
 export const WindowContainer: React.FC = () => {
-    const { windows, windowStates, setWindowState, closeWindow, focusWindow, lockInput, unlockInput } = useWindowManager();
+    const { windows, windowStates, setWindowState, closeWindow, focusWindow, minimizeWindow, lockInput, unlockInput } = useWindowManager();
     const { settings, setTheme, setWallpaper, updateSettings, availableWallpapers, getWallpaperContent } = useSettings();
 
     const visibleWindows = windows.filter((w) => !w.isMinimized);
+
+    // Create memoized IPC contexts for each window
+    const windowIPCContexts = useMemo(() => {
+        const contexts = new Map();
+        visibleWindows.forEach((window) => {
+            contexts.set(window.id, createWindowIPC(window.id));
+        });
+        return contexts;
+    }, [visibleWindows.map(w => w.id).join(',')]);
+
+    // Create memoized API contexts for each window
+    const windowAPIContexts = useMemo(() => {
+        const contexts = new Map();
+        visibleWindows.forEach((window) => {
+            const ipc = windowIPCContexts.get(window.id);
+            if (ipc) {
+                const apiContext: APICreationContext = {
+                    ipc,
+                    getSettings: () => ({ ...settings } as { sounds: boolean;[key: string]: unknown }),
+                    closeWindow: (id: string) => closeWindow(id),
+                    minimizeWindow: (id: string) => minimizeWindow(id),
+                    focusWindow: (id: string) => focusWindow(id),
+                    getWindows: (): WindowInfo[] => windows.map(w => ({
+                        id: w.id,
+                        programId: w.program.manifest.id,
+                        programName: w.program.manifest.name,
+                        isFocused: w.isFocused,
+                        isMinimized: w.isMinimized,
+                    })),
+                };
+                contexts.set(window.id, apiManager.createWindowAPI(window.id, window.program.manifest.id, apiContext));
+            }
+        });
+        return contexts;
+    }, [visibleWindows.map(w => w.id).join(','), settings, windows]);
 
     if (visibleWindows.length === 0) {
         return null;
@@ -329,6 +369,12 @@ export const WindowContainer: React.FC = () => {
                     stateManager.clearState(program.manifest.id);
                 };
 
+                // Get IPC context for this window
+                const windowIPC = windowIPCContexts.get(id);
+
+                // Get API context for this window
+                const windowAPI = windowAPIContexts.get(id);
+
                 return (
                     <Box key={id} flexGrow={1} flexBasis={0}>
                         <Component
@@ -347,6 +393,9 @@ export const WindowContainer: React.FC = () => {
                             savedState={savedState}
                             saveState={saveState}
                             clearState={clearState}
+                            ipc={windowIPC}
+                            windowId={id}
+                            api={windowAPI}
                         />
                     </Box>
                 );

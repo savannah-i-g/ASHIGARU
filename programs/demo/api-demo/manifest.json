@@ -1,0 +1,10 @@
+{
+    "id": "api-demo",
+    "name": "API Demo",
+    "version": "1.0.0",
+    "description": "Demonstrates the unified API system with system, storage, notifications, sound, and more",
+    "author": "ASHIGARU",
+    "icon": "🔌",
+    "category": "demo",
+    "entry": "index.js"
+}

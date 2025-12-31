@@ -1,4 +1,5 @@
 import React from 'react';
+import type { IPCContextType } from './ipc.js';
 
 /**
  * Program manifest schema - defines discoverable program metadata
@@ -80,6 +81,15 @@ export interface ProgramProps {
 
     /** Clear saved state callback (optional - for state persistence) */
     clearState?: () => void;
+
+    /** IPC context for inter-program communication (optional) */
+    ipc?: IPCContextType;
+
+    /** Current window ID for this program instance (optional) */
+    windowId?: string;
+
+    /** Unified API for system features (optional) */
+    api?: import('../core/api/types.js').ProgramAPI;
 }
 
 /**

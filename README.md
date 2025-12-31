@@ -1,6 +1,6 @@
 # ASHIGARU
 
-![Version](https://img.shields.io/badge/version-1.2.2-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.5-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7.2-blue.svg)
@@ -20,6 +20,7 @@ A modular Terminal User Interface (TUI) framework built with React and Ink. ASHI
   - [ASHIGARU Suite](#ashigaru-suite)
   - [Utility Programs](#utility-programs)
 - [Keyboard Controls](#keyboard-controls)
+- [API & IPC System](#api--ipc-system)
 - [Development](#development)
   - [Project Structure](#project-structure)
   - [Creating Custom Programs](#creating-custom-programs)
@@ -236,6 +237,68 @@ When using text input fields (file paths, editing, search):
 - Global shortcuts are automatically disabled to prevent accidental actions
 - `Esc` always available to exit text input mode
 - Input automatically unlocked when exiting text mode
+
+---
+
+## API & IPC System
+
+ASHIGARU v1.2.5 introduces a unified API layer and Inter-Process Communication (IPC) system for programs.
+
+### Unified API
+
+Programs receive an `api` prop with access to system features:
+
+| Module | Description |
+|--------|-------------|
+| `api.system` | System info, events, and lifecycle |
+| `api.storage` | Persistent key-value storage per program |
+| `api.notifications` | Toast notifications via IPC |
+| `api.windows` | Window management operations |
+| `api.sound` | Audio feedback (system + custom sounds) |
+| `api.ai` | AI/LLM capabilities |
+
+**Example:**
+```javascript
+const MyProgram = ({ api }) => {
+    const stats = api.system.getStats();
+    await api.storage.set('key', value);
+    api.notifications.success('Saved!');
+    api.sound.playCustom('alert.mp3');
+};
+```
+
+### IPC System
+
+Programs can communicate via the `ipc` prop:
+
+- **Pub/Sub** - Broadcast messages to channels (`ipc.publish`, `ipc.subscribe`)
+- **Direct** - Send to specific windows (`ipc.sendToWindow`, `ipc.onDirectMessage`)
+- **Services** - Register callable functions (`ipc.registerService`, `ipc.callService`)
+- **Request/Response** - Await responses (`ipc.request`, `ipc.respond`)
+
+**Example:**
+```javascript
+// Publish
+ipc.publish('myapp.events', 'status-update', { value: 42 });
+
+// Subscribe
+ipc.subscribe('myapp.*', (message) => console.log(message));
+
+// Register service
+ipc.registerService('calculator', {
+    add: async (a, b) => a + b
+});
+
+// Call service
+const result = await ipc.callService('calculator', 'add', 5, 3);
+```
+
+### Documentation
+
+For complete API and IPC documentation:
+
+- **[docs/API.md](docs/API.md)** - Complete API reference
+- **[docs/IPC.md](docs/IPC.md)** - Complete IPC reference
 
 ---
 
@@ -525,7 +588,28 @@ For issues, feature requests, or questions:
 
 ## Changelog
 
-### v1.2.2 (Latest)
+### v1.2.5 (Latest)
+
+**Major Features:**
+- **Unified API System** - Programs receive an `api` prop with access to system, storage, notifications, windows, sound, and AI modules
+- **IPC System** - Inter-process communication with pub/sub, direct messaging, service registry, and request/response patterns
+- **Custom Program Sounds** - Programs can bundle their own sounds in a `/sounds` directory
+- **Comprehensive Documentation** - New `docs/API.md` and `docs/IPC.md` reference guides
+
+**API Modules:**
+- `api.system` - System stats, events, lifecycle
+- `api.storage` - Persistent key-value storage in `~/.ashigaru-data/`
+- `api.notifications` - Toast notifications via IPC broadcast
+- `api.windows` - Window management and direct messaging
+- `api.sound` - System sounds + `playCustom()` for program-bundled audio
+- `api.ai` - AI/LLM integration with streaming support
+
+**Demo Programs:**
+- API Demo - Interactive demonstration of all API modules
+- IPC Monitor - Real-time IPC activity viewer
+- IPC Broadcaster - Message publishing and service demo
+
+### v1.2.2
 
 **Major Features:**
 - **Control Panel** - Complete redesign of Settings as a full-featured Control Panel with categorized sidebar navigation

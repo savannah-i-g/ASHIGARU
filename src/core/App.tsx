@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box, useInput } from 'ink';
 import { WindowManagerProvider } from './WindowManager.js';
 import { SettingsProvider } from './SettingsContext.js';
+import { IPCContextProvider } from './IPCContext.js';
 import { Shell } from './Shell.js';
 import { Intro } from '../components/Intro.js';
 
@@ -27,11 +28,13 @@ export const App: React.FC = () => {
 
     return (
         <SettingsProvider>
-            <WindowManagerProvider>
-                <Box flexDirection="column" width="100%" height="100%">
-                    <Shell />
-                </Box>
-            </WindowManagerProvider>
+            <IPCContextProvider>
+                <WindowManagerProvider>
+                    <Box flexDirection="column" width="100%" height="100%">
+                        <Shell />
+                    </Box>
+                </WindowManagerProvider>
+            </IPCContextProvider>
         </SettingsProvider>
     );
 };
