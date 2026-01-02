@@ -1,0 +1,10 @@
+{
+    "id": "neorin-ai",
+    "name": "NeoRIN/AI",
+    "version": "2.0.0",
+    "description": "Tactical AI Assistant with emotional state display",
+    "author": "ASHIGARU",
+    "icon": "◈",
+    "category": "ai",
+    "entry": "index.js"
+}

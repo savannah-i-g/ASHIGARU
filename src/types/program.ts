@@ -90,6 +90,9 @@ export interface ProgramProps {
 
     /** Unified API for system features (optional) */
     api?: import('../core/api/types.js').ProgramAPI;
+
+    /** Number of visible (non-minimized) windows - for full-screen detection (optional) */
+    visibleWindowCount?: number;
 }
 
 /**

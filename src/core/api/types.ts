@@ -117,6 +117,8 @@ export interface WindowsAPI {
     sendMessage(windowId: string, type: string, payload: unknown): void;
     /** Listen for direct messages */
     onMessage(handler: (message: { type: string; payload: unknown; sender: string }) => void): () => void;
+    /** Check if current window is the only visible (non-minimized) window */
+    isFullScreen(): boolean;
 }
 
 // ===================

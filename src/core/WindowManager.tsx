@@ -397,6 +397,7 @@ export const WindowContainer: React.FC = () => {
                             ipc={windowIPC}
                             windowId={id}
                             api={windowAPI}
+                            visibleWindowCount={visibleWindows.length}
                         />
                     </Box>
                 );

@@ -1,6 +1,6 @@
 # ASHIGARU
 
-![Version](https://img.shields.io/badge/version-1.2.6-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.7-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Node](https://img.shields.io/badge/node-%3E%3D16.0.0-brightgreen.svg)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.7.2-blue.svg)
@@ -588,7 +588,20 @@ For issues, feature requests, or questions:
 
 ## Changelog
 
-### v1.2.6 (Latest)
+### v1.2.7 (Latest)
+
+**New Features:**
+- **NeoRin-AI Blink Animation** - Lifelike blinking for AI character
+  - Random blinking every 2.5-7 seconds when idle
+  - Occasional double-blinks (~20% chance) for natural behavior
+  - Variable blink duration (100-180ms)
+  - Auto-return to neutral 3.5 seconds after AI response
+
+**Bug Fixes:**
+- Fixed chat message overflow into header/footer areas in NeoRin-AI
+- Improved viewport height calculation for proper layout bounds
+
+### v1.2.6
 
 **New Features:**
 - **Space Shooter Game** - ASCII vertical scrolling shooter in `programs/games/`
