@@ -82,5 +82,14 @@ export const createWindowsAPI = (
             });
             return () => subscription.unsubscribe();
         },
+
+        isFullScreen(): boolean {
+            if (context.getWindows) {
+                const windows = context.getWindows();
+                const visibleWindows = windows.filter(w => !w.isMinimized);
+                return visibleWindows.length === 1 && visibleWindows[0].id === windowId;
+            }
+            return false;
+        },
     };
 };
